@@ -72,8 +72,10 @@ foreach( net cv~>nets
         cdf = cdfGetInstCDF( inst )
         w = getP( cdf '("w" "fw" "wf" "wtot" "totalw" "W") )
         l = getP( cdf '("l" "lr" "L") )
-        printf("  %-16s master=%-22s term=%-4s W=%A  L=%A\n"
-               inst~>name inst~>master~>cellName iterm~>name w l)
+        gt = car( setof( it inst~>instTerms rexMatchp( "^G" upperCase( it~>name ) ) ) )
+        gnet = and( gt gt~>net gt~>net~>name )
+        printf("  %-14s master=%-18s gate=%-10s W=%A  L=%A\n"
+               inst~>name inst~>master~>cellName gnet w l)
       )
     )
   )

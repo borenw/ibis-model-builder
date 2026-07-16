@@ -190,8 +190,12 @@
       <div id="cad_skillwrap" hidden>
         <div class="outbar" style="margin-top:0.8rem"><button id="copySkill">Copy script</button></div>
         <pre id="cad_skill"></pre>
-        <p class="note">Run the above in the Virtuoso CIW. It lists <strong>every instance on the PAD net with its W/L</strong> — your drivers are the <code>pfet</code> (pull-up) and <code>nfet</code> (pull-down) rows. <strong>If nothing prints</strong>, the net name didn't match your pattern — the script then lists the cell's actual net names so you can fix the pattern. Most reliable path: it also writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Then enter the W/L below to build directly.</p>
+        <p class="note">Run the above in the Virtuoso CIW. It lists <strong>every instance on the PAD net with its W/L</strong> — your drivers are the <code>pfet</code> (pull-up) and <code>nfet</code> (pull-down) rows. <strong>If nothing prints</strong>, the net name didn't match your pattern — the script then lists the cell's actual net names so you can fix the pattern. Most reliable path: it also writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Or paste the whole output into the box below to auto-sum parallel fingers and fill W/L.</p>
       </div>
+      <label class="full" style="margin-top:0.8rem">Paste the SKILL output here — it sums the widths of parallel fingers (same type, same gate net, same L) and fills W/L below
+        <textarea id="cad_out" rows="5" placeholder="=== PAD net: PAD ===&#10;  MN0  master=nfet_01v8  gate=NG  W=30u  L=0.15u&#10;  MN1  master=nfet_01v8  gate=NG  W=30u  L=0.15u&#10;  MP0  master=pfet_01v8  gate=PG  W=65u  L=0.15u"></textarea></label>
+      <button type="button" id="parseCadOut" class="secondary">↧ Parse output → sum fingers → fill W/L</button>
+      <p class="note" id="cadOutInfo"></p>
       <div class="grid" style="margin-top:0.8rem">
         <label>Process node<select id="cad_node"></select></label>
         <label>Pulldown NMOS W (µm)<input id="cad_wN" type="number" step="0.01" placeholder="from script"></label>

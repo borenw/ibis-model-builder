@@ -10,7 +10,7 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.8";
+  const APP_REV = "v1.9";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -344,8 +344,10 @@
       "        cdf = cdfGetInstCDF( inst )",
       "        w = getP( cdf '(\"w\" \"fw\" \"wf\" \"wtot\" \"totalw\" \"W\") )",
       "        l = getP( cdf '(\"l\" \"lr\" \"L\") )",
-      '        printf("  %-16s master=%-22s term=%-4s W=%A  L=%A\\n"',
-      "               inst~>name inst~>master~>cellName iterm~>name w l)",
+      "        gt = car( setof( it inst~>instTerms rexMatchp( \"^G\" upperCase( it~>name ) ) ) )",
+      "        gnet = and( gt gt~>net gt~>net~>name )",
+      '        printf("  %-14s master=%-18s gate=%-10s W=%A  L=%A\\n"',
+      "               inst~>name inst~>master~>cellName gnet w l)",
       "      )",
       "    )",
       "  )",
@@ -377,6 +379,77 @@
         const b = $("copySkill"); const o = b.textContent; b.textContent = "Copied!";
         setTimeout(function () { b.textContent = o; }, 1200);
       });
+    });
+  }
+
+  // Parse the SKILL output text: group devices by type + gate net + L and
+  // SUM the widths (parallel fingers act as one wider driver). Fill W/L.
+  function cadTypeOf(m) {
+    m = (m || "").toLowerCase();
+    if (/nfet|nmos|nch|(^|_)n_?fet|(^|_)nmos/.test(m) || /nfet|nmos|nch/.test(m)) return "N";
+    if (/pfet|pmos|pch/.test(m)) return "P";
+    return null;
+  }
+  function toUm(s) {
+    s = String(s).trim();
+    const m = s.match(/^([+-]?[0-9.]+(?:[eE][+-]?[0-9]+)?)\s*(meg|[fpnumµ])?/);
+    if (!m) return NaN;
+    let x = parseFloat(m[1]);
+    if (m[2]) {
+      const SI = { f: 1e-15, p: 1e-12, n: 1e-9, u: 1e-6, "µ": 1e-6, m: 1e-3 };
+      return x * (SI[m[2].toLowerCase()] || 1) * 1e6;       // meters -> µm
+    }
+    return (Math.abs(x) > 0 && Math.abs(x) < 1e-3) ? x * 1e6 : x;  // bare: guess meters vs µm
+  }
+
+  function parseCadenceOutput(text) {
+    const rows = [];
+    text.split("\n").forEach(function (line) {
+      if (!/master=/.test(line) || !/\bW=/.test(line) || !/\bL=/.test(line)) return;
+      const master = (line.match(/master=(\S+)/) || [])[1] || "";
+      const gate = (line.match(/gate=(\S+)/) || [])[1] || "?";
+      const w = toUm((line.match(/\bW=(\S+)/) || [])[1]);
+      const l = toUm((line.match(/\bL=(\S+)/) || [])[1]);
+      const t = cadTypeOf(master);
+      if (!t || !(w > 0) || !(l > 0)) return;
+      rows.push({ type: t, gate: gate, w: w, l: l });
+    });
+    // group by type|gate|L(rounded) and sum widths
+    const groups = {};
+    rows.forEach(function (r) {
+      const key = r.type + "|" + r.gate + "|" + r.l.toFixed(4);
+      if (!groups[key]) groups[key] = { type: r.type, gate: r.gate, l: r.l, sumW: 0, n: 0 };
+      groups[key].sumW += r.w; groups[key].n++;
+    });
+    const list = Object.keys(groups).map(function (k) { return groups[k]; });
+    const bestOf = function (type) {
+      return list.filter(function (g) { return g.type === type; })
+                 .sort(function (a, b) { return b.sumW - a.sumW; })[0] || null;
+    };
+    return { rows: rows.length, groups: list, N: bestOf("N"), P: bestOf("P") };
+  }
+
+  if ($("parseCadOut")) {
+    $("parseCadOut").addEventListener("click", function () {
+      const res = parseCadenceOutput($("cad_out").value);
+      const info = [];
+      if (!res.rows) {
+        info.push("⚠ No device rows found — paste the lines that contain master= / W= / L=.");
+      } else {
+        if (res.N) { $("cad_wN").value = +res.N.sumW.toFixed(4); $("cad_lN").value = +res.N.l.toFixed(4); }
+        if (res.P) { $("cad_wP").value = +res.P.sumW.toFixed(4); $("cad_lP").value = +res.P.l.toFixed(4); }
+        if (res.N) info.push("NMOS: summed " + res.N.n + " finger(s) on gate '" + res.N.gate +
+          "' → W=" + (+res.N.sumW.toFixed(3)) + " µm, L=" + (+res.N.l.toFixed(3)) + " µm");
+        if (res.P) info.push("PMOS: summed " + res.P.n + " finger(s) on gate '" + res.P.gate +
+          "' → W=" + (+res.P.sumW.toFixed(3)) + " µm, L=" + (+res.P.l.toFixed(3)) + " µm");
+        const nOther = res.groups.filter(function (g) { return g.type === "N"; }).length - (res.N ? 1 : 0);
+        const pOther = res.groups.filter(function (g) { return g.type === "P"; }).length - (res.P ? 1 : 0);
+        if (nOther > 0 || pOther > 0)
+          info.push("(picked the largest-width gate group per type; " + (nOther + pOther) +
+            " other group(s) — different gate/L — ignored. Series/cascode stacks are NOT auto-detected.)");
+      }
+      $("cadOutInfo").textContent = info.join("  ·  ");
+      updateDiagram();
     });
   }
 
