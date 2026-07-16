@@ -40,8 +40,10 @@ back to build the model.
 
 PAD nets are usually named `PAD`, `PAD1`, `PAD_A`, … so the pin field accepts a
 **wildcard** — the default `PAD*` matches all of them (netlist auto-detection matches
-the same `PAD*` naming). The same script is committed for standalone use at
-[`tools/extract_pad_wl.il`](tools/extract_pad_wl.il).
+the same `PAD*` naming). There's also an optional **Schematic OA path** field: give it
+the path to your OA library and the script registers the library (`ddCreateLib`) so
+`lib/cell/view` resolves even if it isn't in your `cds.lib` yet. The same script is
+committed for standalone use at [`tools/extract_pad_wl.il`](tools/extract_pad_wl.il).
 
 ### PAD auto-detection
 

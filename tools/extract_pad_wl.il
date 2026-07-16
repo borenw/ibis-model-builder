@@ -19,9 +19,18 @@ lib    = "my_lib"
 cell   = "io_buffer"
 view   = "schematic"
 padPat = "PAD*"            ; shell-style wildcard; * matches any suffix
+oaPath = ""               ; optional: path to the OA library dir (else "")
 
 ;; --- convert the wildcard to an anchored SKILL regex --------------------
 padRx = strcat( "^" (rexReplace( rexReplace( padPat "\\*" ".*" 0 ) "\\." "\\." 0 )) "$" )
+
+;; --- 0) register the library at its OA path if given -------------------
+when( and( oaPath nequal( oaPath "" ) )
+  unless( ddGetObj( lib )
+    ddCreateLib( lib oaPath )
+    printf("Registered library %s at %s\n" lib oaPath)
+  )
+)
 
 ;; --- 1) netlist the cell to SPICE --------------------------------------
 simulator( 'spectre )

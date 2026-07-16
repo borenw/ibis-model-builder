@@ -8,6 +8,7 @@
 </head>
 <body>
 <header>
+  <a class="rev" href="https://github.com/borenw/ibis-model-builder" id="rev">rev —</a>
   <h1>IBIS Model Builder</h1>
   <p class="tag">Generate a board-level <code>.ibs</code> model in your browser — from device geometry, from measured edge rates, or from raw I&#8209;V/V&#8209;t data. 100% client-side.</p>
 </header>
@@ -145,6 +146,8 @@
     <!-- Cadence -->
     <div class="panel" id="panel-cad">
       <div class="vmsg warn" style="margin-bottom:0.8rem">⚠ A browser can't read a Cadence OA database or a filesystem path directly. Enter your cell + pin below and this generates a <strong>Virtuoso SKILL/OCEAN script</strong> that netlists the cell and prints the pin's driver W/L. Run it in the CIW, then paste the numbers (or the netlist) back here.</div>
+      <label class="full">Schematic OA path <span class="desc">(optional — path to the library dir, e.g. <code>/proj/pdk/my_lib</code>; used to register the lib so lib/cell/view resolves)</span>
+        <input id="cad_path" placeholder="/path/to/oa/library  (leave blank if the lib is already in cds.lib)"></label>
       <div class="grid">
         <label>Library<input id="cad_lib" value="my_lib"></label>
         <label>Cell<input id="cad_cell" value="io_buffer"></label>

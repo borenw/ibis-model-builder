@@ -9,6 +9,10 @@
   const $ = function (id) { return document.getElementById(id); };
   const num = function (id) { return parseFloat($(id).value); };
 
+  // App revision — shown top-right and stamped into the .ibs [Source] line.
+  const APP_REV = "v1.4";
+  if ($("rev")) $("rev").textContent = "rev " + APP_REV;
+
   let activeTab = "wl";
   let lastText = "";
 
@@ -221,10 +225,10 @@
 
   // ---- Cadence tab: generate a SKILL/OCEAN extraction script ----
   // `padPat` may be a plain net name or a wildcard like "PAD*".
-  function skillScript(lib, cell, view, padPat) {
+  function skillScript(lib, cell, view, padPat, oaPath) {
     // Convert a shell-style wildcard to a SKILL regex anchored at start.
     const rx = "^" + padPat.replace(/[.^$+?()[\]{}|\\]/g, "\\$&").replace(/\*/g, ".*") + "$";
-    return [
+    const head = [
       ";; ===================================================================",
       ";; IBIS Model Builder -- extract PAD driver W/L from a Virtuoso cell",
       ";; Paste into the Virtuoso CIW and press Enter. Run with the PDK",
@@ -233,7 +237,18 @@
       'lib    = "' + lib + '"',
       'cell   = "' + cell + '"',
       'view   = "' + view + '"',
-      'padRx  = "' + rx + '"    ; PAD net pattern (from "' + padPat + '")',
+      'padRx  = "' + rx + '"    ; PAD net pattern (from "' + padPat + '")'
+    ];
+    if (oaPath) {
+      head.push("");
+      head.push(";; 0) Register the library at its OA path so lib/cell/view resolves");
+      head.push(";;    (skip if the lib is already defined in your cds.lib):");
+      head.push('unless( ddGetObj( lib )');
+      head.push('  ddCreateLib( lib "' + oaPath + '" )');
+      head.push('  printf("Registered library %s at %s\\n" lib "' + oaPath + '")');
+      head.push(')');
+    }
+    return head.concat([
       "",
       ";; 1) Netlist the cell to SPICE so you can paste it into the",
       ";;    'Paste SPICE netlist' tab (which auto-detects the PAD):",
@@ -264,7 +279,7 @@
       "  )",
       ")",
       'printf("Copy the pfet/nfet W and L into the W/L fields, or paste the netlist into the netlist tab.\\n")'
-    ].join("\n");
+    ]).join("\n");
   }
 
   if ($("genSkill")) {
@@ -273,7 +288,8 @@
         $("cad_lib").value.trim() || "my_lib",
         $("cad_cell").value.trim() || "io_buffer",
         $("cad_view").value.trim() || "schematic",
-        $("cad_pin").value.trim() || "PAD*"
+        $("cad_pin").value.trim() || "PAD*",
+        $("cad_path").value.trim()
       );
       $("cad_skill").textContent = s;
       $("cad_skillwrap").hidden = false;
@@ -298,8 +314,10 @@
     const ccompOv = $("cad_ccomp").value ? parseFloat($("cad_ccomp").value) * 1e-12 : null;
     const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
     applyElectrical(d, params.vdd, r);
+    const oaPath = $("cad_path").value.trim();
     d.provenance = "From Cadence cell " + $("cad_lib").value + "/" + $("cad_cell").value +
-      " pin " + $("cad_pin").value + "; square-law on node=" + $("cad_node").value +
+      " pin " + $("cad_pin").value + (oaPath ? " (" + oaPath + ")" : "") +
+      "; square-law on node=" + $("cad_node").value +
       ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
   }
 
@@ -433,7 +451,7 @@
       renderValidation(v);
 
       const dateStr = new Date().toISOString().slice(0, 10);
-      lastText = window.IBIS.build(d, dateStr);
+      lastText = window.IBIS.build(d, dateStr, APP_REV);
       $("output").innerHTML = highlightIbis(lastText);
       $("outCard").hidden = false;
       $("outCard").scrollIntoView({ behavior: "smooth", block: "start" });

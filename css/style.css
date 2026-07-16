@@ -27,7 +27,14 @@ body {
   color: var(--ink);
   line-height: 1.5;
 }
-header { padding: 2rem 1.25rem 0.5rem; max-width: 900px; margin: 0 auto; }
+header { padding: 2rem 1.25rem 0.5rem; max-width: 900px; margin: 0 auto; position: relative; }
+.rev {
+  position: absolute; top: 1.5rem; right: 1.25rem;
+  font-size: 0.72rem; font-family: ui-monospace, Menlo, monospace;
+  color: var(--muted); text-decoration: none;
+  border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.6rem;
+}
+.rev:hover { border-color: var(--accent); color: var(--accent); }
 h1 { margin: 0; font-size: 1.7rem; letter-spacing: -0.02em; }
 .tag { color: var(--muted); max-width: 60ch; }
 code { background: rgba(255,255,255,0.07); padding: 0.05em 0.35em; border-radius: 4px; font-size: 0.9em; }
