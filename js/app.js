@@ -10,7 +10,7 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v2.3";
+  const APP_REV = "v2.4";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "cad";
@@ -452,28 +452,59 @@
     return { rows: rows.length, groups: list, N: bestOf("N"), P: bestOf("P") };
   }
 
+  let cadGroups = [];   // last-parsed device groups (type/gate/L/sumW)
+
+  function gateOptText(g) {
+    return g.gate + " — ΣW=" + (+g.sumW.toFixed(3)) + " µm, L=" + (+g.l.toFixed(3)) +
+      " µm (" + g.n + " finger" + (g.n > 1 ? "s" : "") + ")";
+  }
+  // Populate a gate <select> with this type's groups, largest width first
+  // (default selected). Returns the count.
+  function fillGateSelect(sel, type) {
+    sel.innerHTML = "";
+    const gs = cadGroups.map(function (g, i) { return { g: g, i: i }; })
+      .filter(function (x) { return x.g.type === type; })
+      .sort(function (a, b) { return b.g.sumW - a.g.sumW; });
+    gs.forEach(function (x, k) {
+      const o = document.createElement("option");
+      o.value = x.i; o.textContent = gateOptText(x.g);
+      if (k === 0) o.selected = true;
+      sel.appendChild(o);
+    });
+    return gs.length;
+  }
+  // Copy the selected gate group's summed W/L into the input boxes.
+  function applyGate(type) {
+    const sel = type === "N" ? $("cad_gateN") : $("cad_gateP");
+    const g = cadGroups[parseInt(sel.value, 10)];
+    if (!g) return;
+    if (type === "N") { $("cad_wN").value = +g.sumW.toFixed(4); $("cad_lN").value = +g.l.toFixed(4); }
+    else { $("cad_wP").value = +g.sumW.toFixed(4); $("cad_lP").value = +g.l.toFixed(4); }
+  }
+
   if ($("parseCadOut")) {
     $("parseCadOut").addEventListener("click", function () {
       const res = parseCadenceOutput($("cad_out").value);
+      cadGroups = res.groups || [];
       const info = [];
       if (!res.rows) {
         info.push("⚠ No device rows found — paste the lines that contain master= / W= / L=.");
+        $("cad_gatesel").hidden = true;
       } else {
-        if (res.N) { $("cad_wN").value = +res.N.sumW.toFixed(4); $("cad_lN").value = +res.N.l.toFixed(4); }
-        if (res.P) { $("cad_wP").value = +res.P.sumW.toFixed(4); $("cad_lP").value = +res.P.l.toFixed(4); }
-        if (res.N) info.push("NMOS: summed " + res.N.n + " finger(s) on gate '" + res.N.gate +
-          "' → W=" + (+res.N.sumW.toFixed(3)) + " µm, L=" + (+res.N.l.toFixed(3)) + " µm");
-        if (res.P) info.push("PMOS: summed " + res.P.n + " finger(s) on gate '" + res.P.gate +
-          "' → W=" + (+res.P.sumW.toFixed(3)) + " µm, L=" + (+res.P.l.toFixed(3)) + " µm");
-        const nOther = res.groups.filter(function (g) { return g.type === "N"; }).length - (res.N ? 1 : 0);
-        const pOther = res.groups.filter(function (g) { return g.type === "P"; }).length - (res.P ? 1 : 0);
-        if (nOther > 0 || pOther > 0)
-          info.push("(picked the largest-width gate group per type; " + (nOther + pOther) +
-            " other group(s) — different gate/L — ignored. Series/cascode stacks are NOT auto-detected.)");
+        const nN = fillGateSelect($("cad_gateN"), "N");
+        const nP = fillGateSelect($("cad_gateP"), "P");
+        if (nN) applyGate("N");
+        if (nP) applyGate("P");
+        $("cad_gatesel").hidden = !(nN || nP);
+        info.push("Parsed " + res.rows + " device(s) into " + cadGroups.length + " gate group(s). " +
+          "Defaulting to the largest-width gate per type — change it with the dropdowns below. " +
+          "(Series/cascode stacks are NOT auto-detected.)");
       }
-      $("cadOutInfo").textContent = info.join("  ·  ");
+      $("cadOutInfo").textContent = info.join(" ");
       updateDiagram();
     });
+    if ($("cad_gateN")) $("cad_gateN").addEventListener("change", function () { applyGate("N"); updateDiagram(); });
+    if ($("cad_gateP")) $("cad_gateP").addEventListener("change", function () { applyGate("P"); updateDiagram(); });
   }
 
   function buildFromCadence(d) {

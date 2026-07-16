@@ -59,6 +59,10 @@ you can then drop into the *Paste SPICE netlist* tab) and prints the W/L of ever
 whose drain touches a PAD net — the push-pull output devices. Paste those numbers
 back to build the model.
 
+After parsing, if the PAD net has more than one gate group per type (e.g. main driver
+vs. a tristate/enable device), a **gate-net dropdown** lets you pick which gate's fingers
+to sum into the driver — defaulting to the largest-width group.
+
 PAD nets are usually named `PAD`, `PAD1`, `PAD_A`, … so the pin field accepts a
 **wildcard** — the default `PAD*` matches all of them (netlist auto-detection matches
 the same `PAD*` naming). There's also an optional **Schematic OA path** field: give it

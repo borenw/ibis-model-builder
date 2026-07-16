@@ -197,6 +197,10 @@
         <textarea id="cad_out" rows="5" placeholder="=== PAD net: PAD ===&#10;  MN0  master=nfet_01v8  gate=NG  W=30u  L=0.15u&#10;  MN1  master=nfet_01v8  gate=NG  W=30u  L=0.15u&#10;  MP0  master=pfet_01v8  gate=PG  W=65u  L=0.15u"></textarea></label>
       <button type="button" id="parseCadOut" class="secondary">↧ Parse output → sum fingers → fill W/L</button>
       <p class="note" id="cadOutInfo"></p>
+      <div class="grid" id="cad_gatesel" hidden>
+        <label>NMOS driver gate net (sum of its fingers)<select id="cad_gateN"></select></label>
+        <label>PMOS driver gate net (sum of its fingers)<select id="cad_gateP"></select></label>
+      </div>
       <div class="grid" style="margin-top:0.8rem">
         <label>Process node<select id="cad_node"></select></label>
         <label>Pulldown NMOS W (µm)<input id="cad_wN" type="number" step="0.01" value="30" placeholder="from script"></label>
