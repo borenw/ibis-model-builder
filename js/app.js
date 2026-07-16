@@ -10,10 +10,10 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v2.1";
+  const APP_REV = "v2.2";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
-  let activeTab = "wl";
+  let activeTab = "cad";
   let lastText = "";
 
   // ---- Populate process-node dropdown ----
@@ -348,7 +348,9 @@
       "        gnet = or( and( gt gt~>net gt~>net~>name ) \"?\" )   ; never nil (%s needs a string)",
       "        nm = or( inst~>name \"?\" )",
       "        mn = or( and( inst~>master inst~>master~>cellName ) \"?\" )",
-      '        printf("  %-14s master=%-18s gate=%-10s W=%A  L=%A\\n" nm mn gnet w l)',
+      "        wS = or( and( stringp(w) w ) and( numberp(w) sprintf(nil \"%g\" w) ) \"?\" )",
+      "        lS = or( and( stringp(l) l ) and( numberp(l) sprintf(nil \"%g\" l) ) \"?\" )",
+      '        printf("  %-14s master=%-18s gate=%-10s W=%s  L=%s\\n" nm mn gnet wS lS)',
       "      )",
       "    )",
       "  )",
@@ -362,19 +364,25 @@
     ]).join("\n");
   }
 
+  function genSkillNow() {
+    if (!$("cad_skill")) return;
+    $("cad_skill").textContent = skillScript(
+      $("cad_lib").value.trim() || "my_lib",
+      $("cad_cell").value.trim() || "io_buffer",
+      $("cad_view").value.trim() || "schematic",
+      $("cad_pin").value.trim() || "PAD*",
+      $("cad_path").value.trim(),
+      $("cad_useopen").checked
+    );
+    $("cad_skillwrap").hidden = false;
+  }
   if ($("genSkill")) {
-    $("genSkill").addEventListener("click", function () {
-      const s = skillScript(
-        $("cad_lib").value.trim() || "my_lib",
-        $("cad_cell").value.trim() || "io_buffer",
-        $("cad_view").value.trim() || "schematic",
-        $("cad_pin").value.trim() || "PAD*",
-        $("cad_path").value.trim(),
-        $("cad_useopen").checked
-      );
-      $("cad_skill").textContent = s;
-      $("cad_skillwrap").hidden = false;
+    $("genSkill").addEventListener("click", genSkillNow);
+    // Re-generate whenever the Cadence inputs change, so it's always current.
+    ["cad_lib", "cad_cell", "cad_view", "cad_pin", "cad_path", "cad_useopen"].forEach(function (id) {
+      if ($(id)) $(id).addEventListener("input", genSkillNow);
     });
+    if ($("cad_useopen")) $("cad_useopen").addEventListener("change", genSkillNow);
     $("copySkill").addEventListener("click", function () {
       navigator.clipboard.writeText($("cad_skill").textContent).then(function () {
         const b = $("copySkill"); const o = b.textContent; b.textContent = "Copied!";
@@ -391,8 +399,9 @@
     if (/pfet|pmos|pch/.test(m)) return "P";
     return null;
   }
+  function unq(s) { return s ? String(s).replace(/^["']+|["']+$/g, "") : s; }
   function toUm(s) {
-    s = String(s).trim();
+    s = unq(String(s).trim());
     const m = s.match(/^([+-]?[0-9.]+(?:[eE][+-]?[0-9]+)?)\s*(meg|[fpnumµ])?/);
     if (!m) return NaN;
     let x = parseFloat(m[1]);
@@ -646,6 +655,8 @@
     });
   });
 
+  // Generate the SKILL script by default so the Cadence tab is ready to run.
+  genSkillNow();
   // Initial render so the diagram is populated on first load.
   updateDiagram();
 })();
