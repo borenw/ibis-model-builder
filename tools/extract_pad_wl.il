@@ -39,25 +39,44 @@ resultsDir( strcat( "/tmp/" cell "_ibis" ) )
 createNetlist( ?recreateAll t ?display nil )
 printf("\nSPICE netlist written under /tmp/%s_ibis -- paste it into the web tool.\n" cell)
 
-;; --- 2) report W/L of FETs whose drain touches a PAD net ---------------
+;; --- 2) report W/L of EVERY instance on a PAD net ----------------------
+;; No over-filtering, so you always see something. The FETs among the rows
+;; are your drivers (pfet = pull-up, nfet = pull-down). Tries the common
+;; CDF param names for W and L.
+procedure( getP( cdf names )
+  let( (p val)
+    foreach( nm names
+      p = and( cdf get( cdf nm ) )
+      when( and( p p~>value ) val = p~>value )
+    )
+    val
+  )
+)
+
 cv = dbOpenCellViewByType( lib cell view "" "r" )
+matched = 0  seen = nil
 foreach( net cv~>nets
   when( rexMatchp( padRx net~>name )
+    matched = matched + 1
     printf("=== PAD net: %s ===\n" net~>name)
     foreach( iterm net~>instTerms
-      when( iterm~>name == "D" || rexMatchp( "D\\|DRAIN\\|PLUS" upperCase(iterm~>name) )
-        inst  = iterm~>inst
-        mname = inst~>master~>cellName
-        when( rexMatchp( "fet\\|mos\\|nch\\|pch" lower(mname) )
-          w = dbReadCDFParam( inst "w" ) || inst~>w
-          l = dbReadCDFParam( inst "l" ) || inst~>l
-          printf("  driver %-18s model=%-26s W=%L  L=%L\n" inst~>name mname w l)
-        )
+      inst = iterm~>inst
+      unless( member( inst seen )
+        seen = cons( inst seen )
+        cdf = cdfGetInstCDF( inst )
+        w = getP( cdf '("w" "fw" "wf" "wtot" "totalw" "W") )
+        l = getP( cdf '("l" "lr" "L") )
+        printf("  %-16s master=%-22s term=%-4s W=%A  L=%A\n"
+               inst~>name inst~>master~>cellName iterm~>name w l)
       )
     )
   )
 )
-printf("Copy the pfet/nfet W and L into the web tool.\n")
+when( zerop( matched )
+  printf("\n[!] No net matched \"%s\". Nets in this cell (pick one):\n" padRx)
+  foreach( net cv~>nets printf("    %s\n" net~>name) )
+)
+printf("\n--> pfet W/L = pull-up, nfet W/L = pull-down. Or paste the SPICE netlist into the web tool.\n")
 
-;; NOTE: CDF parameter names vary by PDK. If W/L come back nil, your models
-;; may use fw / nf / totalw etc. -- adjust the dbReadCDFParam keys above.
+;; NOTE: if W/L still come back nil, print all params for one instance to
+;; find the right names:  cdfGetInstCDF(inst)~>parameters~>name

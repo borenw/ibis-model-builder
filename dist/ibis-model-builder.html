@@ -372,7 +372,7 @@ footer a { color: var(--accent); }
       <div id="cad_skillwrap" hidden>
         <div class="outbar" style="margin-top:0.8rem"><button id="copySkill">Copy script</button></div>
         <pre id="cad_skill"></pre>
-        <p class="note">Run the above in the Virtuoso CIW. It prints lines like <code>PAD driver: pfet W=… L=… / nfet W=… L=…</code> and writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Then either paste the netlist there, or enter the W/L below to build directly.</p>
+        <p class="note">Run the above in the Virtuoso CIW. It lists <strong>every instance on the PAD net with its W/L</strong> — your drivers are the <code>pfet</code> (pull-up) and <code>nfet</code> (pull-down) rows. <strong>If nothing prints</strong>, the net name didn't match your pattern — the script then lists the cell's actual net names so you can fix the pattern. Most reliable path: it also writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Then enter the W/L below to build directly.</p>
       </div>
       <div class="grid" style="margin-top:0.8rem">
         <label>Process node<select id="cad_node"></select></label>
@@ -1365,7 +1365,7 @@ window.PROCESS_LIBRARY = {
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.5";
+  const APP_REV = "v1.6";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -1622,27 +1622,43 @@ window.PROCESS_LIBRARY = {
       "createNetlist( ?recreateAll t ?display nil )",
       'printf("\\nSPICE netlist written under /tmp/%s_ibis -- paste it into the web tool.\\n" cell)',
       "",
-      ";; 2) For every net matching the PAD pattern, print the W/L of each",
-      ";;    FET whose drain (terminal D) touches it -- the push-pull output",
-      ";;    devices. Param names vary by PDK; adjust w/l if yours use fw/nf.",
+      ";; 2) Print W/L of EVERY instance connected to a PAD net (the drivers",
+      ";;    are the FETs among them). No over-filtering -- so you always see",
+      ";;    something. Tries the common CDF param names for W and L.",
+      "procedure( getP( cdf names )",
+      "  let( (p val)",
+      "    foreach( nm names",
+      "      p = and( cdf get( cdf nm ) )",
+      "      when( and( p p~>value ) val = p~>value )",
+      "    )",
+      "    val",
+      "  )",
+      ")",
       'cv = dbOpenCellViewByType( lib cell view "" "r" )',
+      "matched = 0  seen = nil",
       "foreach( net cv~>nets",
       "  when( rexMatchp( padRx net~>name )",
+      "    matched = matched + 1",
       '    printf("=== PAD net: %s ===\\n" net~>name)',
       "    foreach( iterm net~>instTerms",
-      '      when( iterm~>name == "D" || rexMatchp( "D\\\\|DRAIN\\\\|PLUS" upperCase(iterm~>name))',
-      "        inst  = iterm~>inst",
-      "        mname = inst~>master~>cellName",
-      '        when( rexMatchp( \"fet\\\\|mos\\\\|nch\\\\|pch\" lower(mname) )',
-      '          w = dbReadCDFParam( inst \"w\" ) || inst~>w',
-      '          l = dbReadCDFParam( inst \"l\" ) || inst~>l',
-      '          printf(\"  driver %-18s model=%-26s W=%L  L=%L\\n\" inst~>name mname w l)',
-      "        )",
+      "      inst = iterm~>inst",
+      "      unless( member( inst seen )",
+      "        seen = cons( inst seen )",
+      "        cdf = cdfGetInstCDF( inst )",
+      "        w = getP( cdf '(\"w\" \"fw\" \"wf\" \"wtot\" \"totalw\" \"W\") )",
+      "        l = getP( cdf '(\"l\" \"lr\" \"L\") )",
+      '        printf("  %-16s master=%-22s term=%-4s W=%A  L=%A\\n"',
+      "               inst~>name inst~>master~>cellName iterm~>name w l)",
       "      )",
       "    )",
       "  )",
       ")",
-      'printf("Copy the pfet/nfet W and L into the W/L fields, or paste the netlist into the netlist tab.\\n")'
+      "when( zerop( matched )",
+      '  printf("\\n[!] No net matched \\"%s\\". Nets in this cell (pick one for the pattern):\\n" padRx)',
+      '  foreach( net cv~>nets printf("    %s\\n" net~>name) )',
+      ")",
+      'printf("\\n--> The FET rows above are your drivers: use the pfet W/L (pull-up) and',
+      '       nfet W/L (pull-down). Or just paste the SPICE netlist into the netlist tab.\\n")'
     ]).join("\n");
   }
 

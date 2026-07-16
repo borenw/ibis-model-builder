@@ -176,7 +176,7 @@
       <div id="cad_skillwrap" hidden>
         <div class="outbar" style="margin-top:0.8rem"><button id="copySkill">Copy script</button></div>
         <pre id="cad_skill"></pre>
-        <p class="note">Run the above in the Virtuoso CIW. It prints lines like <code>PAD driver: pfet W=… L=… / nfet W=… L=…</code> and writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Then either paste the netlist there, or enter the W/L below to build directly.</p>
+        <p class="note">Run the above in the Virtuoso CIW. It lists <strong>every instance on the PAD net with its W/L</strong> — your drivers are the <code>pfet</code> (pull-up) and <code>nfet</code> (pull-down) rows. <strong>If nothing prints</strong>, the net name didn't match your pattern — the script then lists the cell's actual net names so you can fix the pattern. Most reliable path: it also writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Then enter the W/L below to build directly.</p>
       </div>
       <div class="grid" style="margin-top:0.8rem">
         <label>Process node<select id="cad_node"></select></label>
