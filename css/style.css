@@ -69,6 +69,13 @@ button.primary {
 }
 button.primary:hover { filter: brightness(1.08); }
 
+button.secondary {
+  margin-top: 0.5rem; background: var(--card2); color: var(--ink);
+  border: 1px solid var(--accent); padding: 0.55rem 1.1rem; border-radius: 9px;
+  font-size: 0.9rem; cursor: pointer;
+}
+button.secondary:hover { background: var(--accent2); color: #fff; }
+
 .outbar { display: flex; gap: 0.6rem; margin-bottom: 0.8rem; }
 .outbar button {
   background: var(--card2); color: var(--ink); border: 1px solid var(--line);

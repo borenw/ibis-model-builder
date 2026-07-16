@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IBIS Model Builder</title>
+<style>
+:root {
+  --bg: #0f1420;
+  --card: #182030;
+  --card2: #1e2740;
+  --ink: #e6ecf5;
+  --muted: #9aa7bd;
+  --line: #2c3750;
+  --accent: #4da3ff;
+  --accent2: #2b6fd6;
+  --ok: #3ecb8c;
+  --warn: #f0b34a;
+  --err: #ff6b6b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+}
+header { padding: 2rem 1.25rem 0.5rem; max-width: 900px; margin: 0 auto; }
+h1 { margin: 0; font-size: 1.7rem; letter-spacing: -0.02em; }
+.tag { color: var(--muted); max-width: 60ch; }
+code { background: rgba(255,255,255,0.07); padding: 0.05em 0.35em; border-radius: 4px; font-size: 0.9em; }
+
+.disclaimer {
+  max-width: 900px; margin: 0.5rem auto 1rem; padding: 0.75rem 1rem;
+  background: rgba(240,179,74,0.12); border: 1px solid rgba(240,179,74,0.4);
+  border-radius: 10px; color: #f3d9a8; font-size: 0.9rem;
+}
+.disclaimer strong { color: var(--warn); }
+
+main { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 3rem; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 1.25rem 1.25rem 1.5rem; margin-bottom: 1.25rem;
+}
+.card h2 { margin: 0 0 1rem; font-size: 1.05rem; color: var(--accent); font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem 1rem; }
+label { display: flex; flex-direction: column; font-size: 0.82rem; color: var(--muted); gap: 0.3rem; }
+label.full { grid-column: 1 / -1; }
+input, select, textarea {
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 0.5rem 0.6rem; font-size: 0.92rem; font-family: inherit;
+}
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+details { margin-top: 0.9rem; }
+summary { cursor: pointer; color: var(--accent); font-size: 0.85rem; margin-bottom: 0.6rem; }
+.note { color: var(--muted); font-size: 0.82rem; font-style: italic; margin: 0.6rem 0 0; }
+
+.tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.tab {
+  background: var(--card2); color: var(--muted); border: 1px solid var(--line);
+  padding: 0.5rem 0.9rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem;
+}
+.tab.active { background: var(--accent2); color: #fff; border-color: var(--accent); }
+.panel { display: none; }
+.panel.active { display: block; }
+
+button.primary {
+  margin-top: 1.25rem; background: linear-gradient(180deg, var(--accent), var(--accent2));
+  color: #fff; border: none; padding: 0.7rem 1.3rem; border-radius: 10px;
+  font-size: 0.98rem; font-weight: 600; cursor: pointer;
+}
+button.primary:hover { filter: brightness(1.08); }
+
+button.secondary {
+  margin-top: 0.5rem; background: var(--card2); color: var(--ink);
+  border: 1px solid var(--accent); padding: 0.55rem 1.1rem; border-radius: 9px;
+  font-size: 0.9rem; cursor: pointer;
+}
+button.secondary:hover { background: var(--accent2); color: #fff; }
+
+.outbar { display: flex; gap: 0.6rem; margin-bottom: 0.8rem; }
+.outbar button {
+  background: var(--card2); color: var(--ink); border: 1px solid var(--line);
+  padding: 0.45rem 0.9rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+}
+.outbar button:hover { border-color: var(--accent); }
+
+pre {
+  background: #0a0e17; border: 1px solid var(--line); border-radius: 10px;
+  padding: 1rem; overflow-x: auto; font-size: 0.8rem; line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #cdd6e6;
+  max-height: 520px; overflow-y: auto;
+}
+
+.vmsg { padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.86rem; margin-bottom: 0.4rem; }
+.vmsg.ok { background: rgba(62,203,140,0.12); color: var(--ok); }
+.vmsg.warn { background: rgba(240,179,74,0.12); color: var(--warn); }
+.vmsg.err { background: rgba(255,107,107,0.12); color: var(--err); }
+
+footer { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 3rem; color: var(--muted); font-size: 0.8rem; }
+footer a { color: var(--accent); }
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f7fb; --card: #ffffff; --card2: #eef2f9; --ink: #1a2233;
+    --muted: #5b6b85; --line: #d5dced;
+  }
+  pre { background: #0a0e17; color: #cdd6e6; }
+}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>IBIS Model Builder</h1>
+  <p class="tag">Generate a board-level <code>.ibs</code> model in your browser — from device geometry, from measured edge rates, or from raw I&#8209;V/V&#8209;t data. 100% client-side.</p>
+</header>
+
+<div class="disclaimer">
+  <strong>Estimate, not sign-off.</strong> The W/L path uses long-channel square-law physics and will overstate drive at modern nodes. Trust the <em>Rise/Fall</em> and <em>Paste Data</em> paths more than the geometry path. Always correlate against SPICE or silicon before real use.
+</div>
+
+<main>
+  <!-- ============ Shared settings ============ -->
+  <section class="card">
+    <h2>1 &middot; Component &amp; model</h2>
+    <div class="grid">
+      <label>Component name<input id="component" value="MyChip"></label>
+      <label>Manufacturer<input id="manufacturer" value="Unknown"></label>
+      <label>Model name<input id="modelName" value="buf_io"></label>
+      <label>Model type
+        <select id="modelType">
+          <option>I/O</option><option>Output</option><option>3-state</option>
+          <option>Open_drain</option><option>Input</option>
+        </select>
+      </label>
+      <label>Vinl (V)<input id="vinl" type="number" step="0.01" value="0.8"></label>
+      <label>Vinh (V)<input id="vinh" type="number" step="0.01" value="2.0"></label>
+    </div>
+    <details>
+      <summary>Package &amp; pin parasitics, temperature</summary>
+      <div class="grid">
+        <label>R_pkg (&#8486;)<input id="rpkg" type="number" step="0.01" value="0.1"></label>
+        <label>L_pkg (H)<input id="lpkg" type="number" step="1e-10" value="5e-9"></label>
+        <label>C_pkg (F)<input id="cpkg" type="number" step="1e-13" value="0.5e-12"></label>
+        <label>R_pin (&#8486;)<input id="rpin" type="number" step="0.01" value="0.1"></label>
+        <label>L_pin (H)<input id="lpin" type="number" step="1e-10" value="3e-9"></label>
+        <label>C_pin (F)<input id="cpin" type="number" step="1e-13" value="0.3e-12"></label>
+        <label>Temp typ (&deg;C)<input id="ttyp" type="number" value="25"></label>
+        <label>Temp min (&deg;C)<input id="tmin" type="number" value="0"></label>
+        <label>Temp max (&deg;C)<input id="tmax" type="number" value="85"></label>
+      </div>
+    </details>
+    <label class="full">Pins — one <code>number name</code> per line (all share the model above)
+      <textarea id="pins" rows="3">1 DQ0
+2 DQ1
+3 DQ2</textarea>
+    </label>
+  </section>
+
+  <!-- ============ Input method tabs ============ -->
+  <section class="card">
+    <h2>2 &middot; Where does the data come from?</h2>
+    <div class="tabs">
+      <button class="tab active" data-tab="wl">Device W/L + Process</button>
+      <button class="tab" data-tab="rf">Rise / Fall @ load</button>
+      <button class="tab" data-tab="paste">Paste I&#8209;V / V&#8209;t</button>
+      <button class="tab" data-tab="net">Paste SPICE netlist</button>
+    </div>
+
+    <!-- W/L -->
+    <div class="panel active" id="panel-wl">
+      <div class="grid">
+        <label>Process node
+          <select id="node"></select>
+        </label>
+        <label>NMOS W/L<input id="wlN" type="number" step="0.1" value="20"></label>
+        <label>PMOS W/L<input id="wlP" type="number" step="0.1" value="40"></label>
+        <label>C_comp override (pF, blank = estimate)<input id="wlCcomp" type="number" step="0.1" placeholder="auto"></label>
+      </div>
+      <p class="note" id="nodeNote"></p>
+      <details>
+        <summary>Edit process parameters (square-law)</summary>
+        <div class="grid">
+          <label>Vdd (V)<input id="p_vdd" type="number" step="0.01"></label>
+          <label>Vth,n (V)<input id="p_vthn" type="number" step="0.01"></label>
+          <label>Vth,p (V)<input id="p_vthp" type="number" step="0.01"></label>
+          <label>k'n (&micro;A/V&sup2;)<input id="p_kpn" type="number" step="1"></label>
+          <label>k'p (&micro;A/V&sup2;)<input id="p_kpp" type="number" step="1"></label>
+          <label>&lambda;n (1/V)<input id="p_ln" type="number" step="0.01"></label>
+          <label>&lambda;p (1/V)<input id="p_lp" type="number" step="0.01"></label>
+          <label>Cox (fF/&micro;m&sup2;)<input id="p_cox" type="number" step="0.1"></label>
+        </div>
+      </details>
+    </div>
+
+    <!-- Rise/Fall -->
+    <div class="panel" id="panel-rf">
+      <div class="grid">
+        <label>Supply / swing Vcc (V)<input id="rf_vcc" type="number" step="0.01" value="1.8"></label>
+        <label>Load cap C_load (pF)<input id="rf_cload" type="number" step="0.1" value="5"></label>
+        <label>Rise time (ns)<input id="rf_tr" type="number" step="0.01" value="1.2"></label>
+        <label>Fall time (ns)<input id="rf_tf" type="number" step="0.01" value="1.0"></label>
+        <label>Edge definition
+          <select id="rf_edge"><option value="20-80">20% – 80%</option><option value="10-90">10% – 90%</option></select>
+        </label>
+        <label>Pin C_comp (pF)<input id="rf_ccomp" type="number" step="0.1" value="2"></label>
+      </div>
+    </div>
+
+    <!-- Paste -->
+    <div class="panel" id="panel-paste">
+      <div class="grid">
+        <label>Vcc (V)<input id="ps_vcc" type="number" step="0.01" value="1.8"></label>
+        <label>Pin C_comp (pF)<input id="ps_ccomp" type="number" step="0.1" value="2"></label>
+        <label>Rise time (ns)<input id="ps_tr" type="number" step="0.01" value="1.2"></label>
+        <label>Fall time (ns)<input id="ps_tf" type="number" step="0.01" value="1.0"></label>
+      </div>
+      <label class="full">Pulldown I&#8209;V — one <code>Vout,current[A]</code> per line
+        <textarea id="ps_pd" rows="4" placeholder="0,0&#10;0.9,0.004&#10;1.8,0.006"></textarea></label>
+      <label class="full">Pullup I&#8209;V — one <code>Vtable(=Vcc-Vout),current[A]</code> per line
+        <textarea id="ps_pu" rows="4" placeholder="0,0&#10;0.9,0.004&#10;1.8,0.006"></textarea></label>
+    </div>
+
+    <!-- Netlist -->
+    <div class="panel" id="panel-net">
+      <label class="full">Paste a SPICE netlist of your output buffer (supports <code>M...</code> devices and SkyWater <code>X...nfet/pfet...</code> subckt devices with <code>W=</code>/<code>L=</code>)
+        <textarea id="net_text" rows="8" placeholder="* simple CMOS output buffer&#10;M1 PAD IN VSS VSS nfet_01v8 W=20u L=0.15u&#10;M2 PAD IN VDD VDD pfet_01v8 W=40u L=0.15u"></textarea>
+      </label>
+      <button id="parseNet" class="secondary">🔍 Parse &amp; auto-detect PAD</button>
+      <div id="netResult" hidden>
+        <div id="netWarn"></div>
+        <p class="note">Auto-detected below — override any field if the guess is wrong.</p>
+        <div class="grid">
+          <label>PAD (I/O) net<select id="net_pad"></select></label>
+          <label>VDD net<select id="net_vdd"></select></label>
+          <label>GND net<select id="net_gnd"></select></label>
+          <label>Input net<select id="net_in"></select></label>
+          <label>Process node<select id="net_node"></select></label>
+          <label>Pulldown NMOS W/L<input id="net_wlN" type="number" step="0.1"></label>
+          <label>Pullup PMOS W/L<input id="net_wlP" type="number" step="0.1"></label>
+          <label>C_comp override (pF, blank = estimate)<input id="net_ccomp" type="number" step="0.1" placeholder="auto"></label>
+        </div>
+        <p class="note" id="net_devinfo"></p>
+      </div>
+    </div>
+
+    <button id="generate" class="primary">Generate IBIS model &rarr;</button>
+  </section>
+
+  <!-- ============ Output ============ -->
+  <section class="card" id="outCard" hidden>
+    <h2>3 &middot; Output</h2>
+    <div id="validation"></div>
+    <div class="outbar">
+      <button id="download">&#8595; Download .ibs</button>
+      <button id="copy">Copy</button>
+    </div>
+    <pre id="output"></pre>
+  </section>
+</main>
+
+<footer>
+  <p>Open source · MIT · <a href="https://github.com/borenw/ibis-model-builder">github.com/borenw/ibis-model-builder</a>. Not affiliated with the IBIS Open Forum. Validate output with <code>ibischk</code> before use.</p>
+</footer>
+
+<script>
+/*
+ * process-library.js
+ * ------------------------------------------------------------------
+ * First-order (square-law) device parameters per process node.
+ *
+ * These are TYPICAL / APPROXIMATE values meant for a ballpark
+ * behavioral estimate only -- NOT sign-off accurate. The only entry
+ * anchored to a real open PDK is `sky130`.
+ *
+ * Fields:
+ *   vdd     : nominal core supply (V)
+ *   vthn    : NMOS threshold (V, positive)
+ *   vthp    : PMOS threshold magnitude (V, positive)
+ *   kpn     : NMOS transconductance param k'n = un*Cox (uA/V^2)
+ *   kpp     : PMOS transconductance param k'p = up*Cox (uA/V^2)
+ *   lambdan : NMOS channel-length modulation (1/V)
+ *   lambdap : PMOS channel-length modulation (1/V)
+ *   cox     : gate-oxide capacitance per area (fF/um^2)
+ *   note    : provenance / caveat shown in the UI
+ * ------------------------------------------------------------------
+ */
+window.PROCESS_LIBRARY = {
+  sky130: {
+    label: "SkyWater sky130 (130 nm, 1.8 V)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.45,
+    kpn: 120, kpp: 40,
+    lambdan: 0.05, lambdap: 0.06,
+    cox: 2.98,
+    note: "Anchored to the SkyWater open PDK 1.8 V devices: toxe = 11.6 nm -> Cox ~ 3.0 fF/um^2. Vth/mobility are approximate typicals for square-law use."
+  },
+  n180: {
+    label: "Generic 180 nm (1.8 V)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.45,
+    kpn: 170, kpp: 40,
+    lambdan: 0.06, lambdap: 0.08,
+    cox: 8.6,
+    note: "Generic textbook typicals for a 0.18 um process (tox ~ 4 nm). Not tied to any specific PDK."
+  },
+  n130: {
+    label: "Generic 130 nm (1.2 V)",
+    vdd: 1.2, vthn: 0.35, vthp: 0.35,
+    kpn: 350, kpp: 80,
+    lambdan: 0.08, lambdap: 0.10,
+    cox: 12.8,
+    note: "Generic textbook typicals for a 0.13 um core device (tox ~ 2.7 nm)."
+  },
+  n90: {
+    label: "Generic 90 nm (1.2 V)",
+    vdd: 1.2, vthn: 0.30, vthp: 0.30,
+    kpn: 430, kpp: 100,
+    lambdan: 0.10, lambdap: 0.12,
+    cox: 15.0,
+    note: "Generic textbook typicals for a 90 nm core device."
+  },
+  n65: {
+    label: "Generic 65 nm (1.0 V)",
+    vdd: 1.0, vthn: 0.28, vthp: 0.28,
+    kpn: 500, kpp: 110,
+    lambdan: 0.14, lambdap: 0.16,
+    cox: 18.0,
+    note: "Generic textbook typicals for a 65 nm core device."
+  },
+  n45: {
+    label: "Generic 45 nm (1.0 V)",
+    vdd: 1.0, vthn: 0.25, vthp: 0.25,
+    kpn: 560, kpp: 120,
+    lambdan: 0.18, lambdap: 0.20,
+    cox: 25.0,
+    note: "Generic textbook typicals for a 45 nm core device."
+  },
+  n28: {
+    label: "Generic 28 nm (0.9 V)",
+    vdd: 0.9, vthn: 0.22, vthp: 0.22,
+    kpn: 620, kpp: 130,
+    lambdan: 0.22, lambdap: 0.24,
+    cox: 30.0,
+    note: "Generic textbook typicals for a 28 nm core device."
+  },
+  custom: {
+    label: "Custom (enter parameters)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.45,
+    kpn: 120, kpp: 40,
+    lambdan: 0.05, lambdap: 0.06,
+    cox: 3.0,
+    note: "User-defined parameters."
+  }
+};
+
+</script>
+<script>
+/*
+ * ibis-core.js
+ * ------------------------------------------------------------------
+ * The heart of the tool: a pure assembler that turns a NORMALIZED
+ * model-data object into a spec-compliant IBIS v3.2 text file.
+ *
+ * Every input adapter (square-law, rise/fall, pasted data) is
+ * responsible for producing this same normalized shape, so the
+ * assembler never needs to know where the numbers came from.
+ *
+ * Normalized model-data shape:
+ * {
+ *   component:  "MyChip",
+ *   manufacturer: "Unknown",
+ *   pkg: { r: 0.1, l: 5e-9, c: 0.5e-12 },       // package parasitics (typ)
+ *   model: {
+ *     name: "buf",
+ *     type: "I/O",                              // I/O | Output | Input | 3-state | Open_drain ...
+ *     polarity: "Non-Inverting",
+ *     enable:   "Active-High",
+ *     vinl: 0.8, vinh: 2.0,
+ *     vcc: 1.8, vccMin: 1.62, vccMax: 1.98,
+ *     tempTyp: 25, tempMin: 0, tempMax: 85,
+ *     ccomp: { typ: 2e-12, min: 1.5e-12, max: 2.5e-12 },
+ *     rpin: 0.1, lpin: 3e-9, cpin: 0.3e-12,
+ *     // I-V tables: array of { v, typ, min, max } (current in Amps)
+ *     pulldown: [...], pullup: [...], gndClamp: [...], powerClamp: [...],
+ *     // ramp: dv over dt (dv in V, dt in s) for typ/min/max
+ *     ramp: { dvr: 0.6*1.8, dtr: {typ:..,min:..,max:..},
+ *             dvf: 0.6*1.8, dtf: {typ:..,min:..,max:..} }
+ *   },
+ *   pins: [ { num:"1", name:"DQ0", model:"buf" }, ... ],
+ *   provenance: "Square-law estimate, node=sky130, ..."   // -> [Notes]
+ * }
+ * ------------------------------------------------------------------
+ */
+(function () {
+  "use strict";
+
+  function eng(x) {
+    // Format a number for IBIS: fixed-ish with enough precision.
+    if (x === 0) return "0";
+    if (!isFinite(x)) return "0";
+    const a = Math.abs(x);
+    if (a >= 1e6 || a < 1e-4) return x.toExponential(4);
+    return x.toPrecision(6).replace(/\.?0+$/, "");
+  }
+
+  // Current column: IBIS wants Amps, printed with a unit-suffixed style
+  // is optional; plain scientific notation is fully spec-legal.
+  function amp(x) {
+    if (x === 0) return "0";
+    return x.toExponential(4);
+  }
+
+  function volt(x) {
+    return (x >= 0 ? " " : "") + x.toFixed(4);
+  }
+
+  function pad(s, n) {
+    s = String(s);
+    return s.length >= n ? s : s + " ".repeat(n - s.length);
+  }
+
+  function ivTable(title, rows) {
+    let out = "[" + title + "]\n";
+    out += "|" + pad(" Voltage", 14) + pad("I(typ)", 16) + pad("I(min)", 16) + "I(max)\n";
+    rows.forEach(function (r) {
+      out += pad(volt(r.v), 15) + pad(amp(r.typ), 16) + pad(amp(r.min), 16) + amp(r.max) + "\n";
+    });
+    out += "|\n";
+    return out;
+  }
+
+  function typMinMaxLine(label, obj, fmt) {
+    fmt = fmt || eng;
+    return pad(label, 14) + pad(fmt(obj.typ), 14) + pad(fmt(obj.min), 14) + fmt(obj.max) + "\n";
+  }
+
+  window.IBIS = {
+    /**
+     * Build the full .ibs text from normalized model data.
+     * `dateStr` is passed in from the caller (no Date.now in core).
+     */
+    build: function (d, dateStr) {
+      const m = d.model;
+      const fileName = (d.component || "model").toLowerCase().replace(/[^a-z0-9_]/g, "_") + ".ibs";
+      let s = "";
+
+      s += "[IBIS Ver]       3.2\n";
+      s += "[File Name]      " + fileName + "\n";
+      s += "[File Rev]       1.0\n";
+      if (dateStr) s += "[Date]           " + dateStr + "\n";
+      s += "[Source]         Generated by IBIS Model Builder (github.com/borenw/ibis-model-builder)\n";
+      s += "[Notes]          " + (d.provenance || "First-order behavioral estimate.") + "\n";
+      s += "[Disclaimer]     THIS MODEL IS A FIRST-ORDER ESTIMATE. It is NOT foundry-\n";
+      s += "|                validated silicon data. Do not use for final sign-off\n";
+      s += "|                without correlating against measurement or SPICE.\n";
+      s += "\n";
+
+      s += "[Component]      " + (d.component || "MyComponent") + "\n";
+      s += "[Manufacturer]   " + (d.manufacturer || "Unknown") + "\n";
+      s += "[Package]\n";
+      s += "|" + pad(" variable", 13) + pad("typ", 14) + pad("min", 14) + "max\n";
+      s += pad("R_pkg", 14) + pad(eng(d.pkg.r), 14) + pad(eng(d.pkg.r), 14) + eng(d.pkg.r) + "\n";
+      s += pad("L_pkg", 14) + pad(eng(d.pkg.l), 14) + pad(eng(d.pkg.l), 14) + eng(d.pkg.l) + "\n";
+      s += pad("C_pkg", 14) + pad(eng(d.pkg.c), 14) + pad(eng(d.pkg.c), 14) + eng(d.pkg.c) + "\n";
+      s += "\n";
+
+      s += "[Pin]  signal_name        model_name          R_pin     L_pin     C_pin\n";
+      d.pins.forEach(function (p) {
+        s += pad(p.num, 7) + pad(p.name, 19) + pad(p.model, 20) +
+             pad(eng(m.rpin), 10) + pad(eng(m.lpin), 10) + eng(m.cpin) + "\n";
+      });
+      s += "\n";
+
+      // ---- Model ----
+      s += "[Model]          " + m.name + "\n";
+      s += "Model_type       " + m.type + "\n";
+      if (m.polarity) s += "Polarity         " + m.polarity + "\n";
+      if (m.enable)   s += "Enable           " + m.enable + "\n";
+      s += "Vinl = " + m.vinl + "V\n";
+      s += "Vinh = " + m.vinh + "V\n";
+      s += "|\n";
+      s += "|" + pad(" variable", 13) + pad("typ", 14) + pad("min", 14) + "max\n";
+      s += typMinMaxLine("C_comp", m.ccomp);
+      s += "|\n";
+      s += "[Voltage Range]  " + m.vcc + "\t" + m.vccMin + "\t" + m.vccMax + "\n";
+      s += "[Temperature Range] " + m.tempTyp + "\t" + m.tempMin + "\t" + m.tempMax + "\n";
+      s += "\n";
+
+      if (m.pulldown && m.pulldown.length)   s += ivTable("Pulldown", m.pulldown) + "\n";
+      if (m.pullup && m.pullup.length)       s += ivTable("Pullup", m.pullup) + "\n";
+      if (m.gndClamp && m.gndClamp.length)   s += ivTable("GND Clamp", m.gndClamp) + "\n";
+      if (m.powerClamp && m.powerClamp.length) s += ivTable("POWER Clamp", m.powerClamp) + "\n";
+
+      // ---- Ramp ----
+      if (m.ramp) {
+        s += "[Ramp]\n";
+        s += "|" + pad(" variable", 13) + pad("typ", 20) + pad("min", 20) + "max\n";
+        s += pad("dV/dt_r", 14) +
+             pad(rampCell(m.ramp.dvr, m.ramp.dtr.typ), 20) +
+             pad(rampCell(m.ramp.dvr, m.ramp.dtr.min), 20) +
+             rampCell(m.ramp.dvr, m.ramp.dtr.max) + "\n";
+        s += pad("dV/dt_f", 14) +
+             pad(rampCell(m.ramp.dvf, m.ramp.dtf.typ), 20) +
+             pad(rampCell(m.ramp.dvf, m.ramp.dtf.min), 20) +
+             rampCell(m.ramp.dvf, m.ramp.dtf.max) + "\n";
+        s += "R_load = " + (m.ramp.rload || 50) + "\n";
+        s += "\n";
+      }
+
+      s += "[End]\n";
+      return s;
+    }
+  };
+
+  function rampCell(dv, dt) {
+    // IBIS ramp cell is "dV/dt" written literally as "<dv>/<dt>"
+    return eng(dv) + "/" + amp(dt).replace("e", "e");
+  }
+})();
+
+</script>
+<script>
+/*
+ * square-law.js
+ * ------------------------------------------------------------------
+ * Adapter: (device W/L + process node) -> normalized IBIS model data.
+ *
+ * Uses the classic long-channel (Shichman-Hodges) MOSFET equations to
+ * synthesize the pullup / pulldown I-V tables, clamp diodes, C_comp
+ * and ramp rates for a simple CMOS push-pull output buffer.
+ *
+ * This is a BALLPARK ESTIMATE. Square-law ignores velocity saturation,
+ * mobility degradation, and short-channel effects -- it will overstate
+ * drive at modern nodes. It is intended for intuition and first-pass
+ * board checks, not sign-off.
+ * ------------------------------------------------------------------
+ */
+(function () {
+  "use strict";
+
+  // NMOS drain current (uA) for source-referenced Vgs, Vds >= 0.
+  // kp in uA/V^2, WL dimensionless (W/L).
+  function idsN(vgs, vds, kp, wl, vth, lambda) {
+    const vov = vgs - vth;
+    if (vov <= 0) return 0;                 // cutoff
+    if (vds <= 0) return 0;                 // handled by clamp region
+    if (vds < vov) {                        // triode
+      return kp * wl * (vov * vds - 0.5 * vds * vds);
+    }
+    return 0.5 * kp * wl * vov * vov * (1 + lambda * vds);  // saturation
+  }
+
+  // Clamp-diode current (A). A real ESD/body diode has series resistance,
+  // so above the ~0.6 V knee the current is limited linearly instead of
+  // blowing up like an ideal exponential. vd = anode-cathode (V).
+  function diode(vd) {
+    const Is = 1e-14, Vt = 0.02585, Von = 0.6, Rs = 5;
+    if (vd <= 0) return -Math.min(Is, 1e-12);        // reverse: ~0 leakage
+    if (vd < Von) return Is * (Math.exp(vd / Vt) - 1);
+    const iKnee = Is * (Math.exp(Von / Vt) - 1);     // current at the knee
+    return iKnee + (vd - Von) / Rs;                  // series-R limited
+  }
+
+  function linspace(a, b, n) {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1));
+    return out;
+  }
+
+  // Build one I-V table over the standard -Vcc..2Vcc range.
+  // `fn(vout)` returns current in Amps for the given output voltage.
+  function tableFromFn(vcc, fn) {
+    const vs = linspace(-vcc, 2 * vcc, 25);
+    return vs.map(function (v) {
+      const i = fn(v);
+      // typ/min/max spread: +/-20% as a crude corner proxy
+      return { v: v, typ: i, min: i * 0.8, max: i * 1.2 };
+    });
+  }
+
+  window.SquareLaw = {
+    /**
+     * opts: {
+     *   params,             // one entry from PROCESS_LIBRARY (already merged w/ overrides)
+     *   wlN, wlP,           // W/L ratios of pulldown NMOS / pullup PMOS
+     *   ccomp,             // optional C_comp override (F); else estimated
+     *   nodeLabel          // for provenance string
+     * }
+     * Returns { pulldown, pullup, gndClamp, powerClamp, ccomp, ramp } plus meta.
+     */
+    generate: function (opts) {
+      const p = opts.params;
+      const vcc = p.vdd;
+      const wlN = opts.wlN, wlP = opts.wlP;
+
+      // Pulldown NMOS: gate @ Vcc, source @ GND, Vds = Vout.
+      // Current SINKS into the pin (positive per IBIS pulldown convention).
+      const pulldown = tableFromFn(vcc, function (vout) {
+        if (vout <= 0) return 0;                 // clamp region
+        return idsN(vcc, Math.min(vout, 2 * vcc), p.kpn, wlN, p.vthn, p.lambdan) * 1e-6;
+      });
+
+      // Pullup PMOS: gate @ GND, source @ Vcc. Table voltage is
+      // referenced to Vcc:  Vtable = Vcc - Vout.  Vsd = Vtable.
+      // We SOURCE current out of the pin.
+      const pullup = tableFromFn(vcc, function (vtable) {
+        // vtable here plays the role of the referenced voltage directly
+        if (vtable <= 0) return 0;
+        return idsN(vcc, Math.min(vtable, 2 * vcc), p.kpp, wlP, p.vthp, p.lambdap) * 1e-6;
+      });
+
+      // GND clamp diode: conducts when Vout < 0 (pin below GND).
+      const gndClamp = tableFromFn(vcc, function (vout) {
+        return -diode(-vout);   // anode=GND, cathode=pin
+      });
+
+      // POWER clamp diode: conducts when Vout > Vcc (pin above rail).
+      const powerClamp = tableFromFn(vcc, function (vout) {
+        return diode(vout - vcc);  // anode=pin, cathode=Vcc
+      });
+
+      // C_comp estimate: gate + junction area cap of both devices + pad.
+      // Assume L = 1 (ratios given as W/L) with a nominal Lmin so area
+      // scales with the ratio; add a fixed pad/ESD cap.
+      const padC = 0.5e-12;
+      const areaCap = (p.cox * 1e-15) * (wlN + wlP) * 0.15 * 0.15; // very rough, um^2
+      const ccomp = opts.ccomp || (padC + areaCap);
+
+      // Ramp: dV/dt through the mid-rail driving C_comp.
+      // Rising uses pullup current at Vout=Vcc/2 (Vtable=Vcc/2).
+      // Falling uses pulldown current at Vout=Vcc/2.
+      const iUp = idsN(vcc, vcc / 2, p.kpp, wlP, p.vthp, p.lambdap) * 1e-6;
+      const iDn = idsN(vcc, vcc / 2, p.kpn, wlN, p.vthn, p.lambdan) * 1e-6;
+      const dv = 0.6 * vcc;                    // 20%-80% swing
+      const dtr = ccomp * dv / Math.max(iUp, 1e-9);
+      const dtf = ccomp * dv / Math.max(iDn, 1e-9);
+
+      return {
+        pulldown: pulldown,
+        pullup: pullup,
+        gndClamp: gndClamp,
+        powerClamp: powerClamp,
+        ccomp: { typ: ccomp, min: ccomp * 0.85, max: ccomp * 1.15 },
+        ramp: {
+          dvr: dv, dvf: dv, rload: 50,
+          dtr: { typ: dtr, min: dtr * 0.7, max: dtr * 1.4 },
+          dtf: { typ: dtf, min: dtf * 0.7, max: dtf * 1.4 }
+        },
+        meta: { vcc: vcc, iUp: iUp, iDn: iDn }
+      };
+    }
+  };
+})();
+
+</script>
+<script>
+/*
+ * risefall.js
+ * ------------------------------------------------------------------
+ * Adapter: (measured/simulated rise & fall time at a known load cap)
+ *          -> normalized IBIS model data.
+ *
+ * This is the MORE TRUSTWORTHY path: rise/fall @ a known capacitive
+ * load is real behavioral data, so the resulting ramp is directly
+ * meaningful. We reconstruct an effective linear driver (an on-
+ * resistance) to populate the pullup/pulldown I-V tables so the model
+ * is complete and usable by any board simulator.
+ * ------------------------------------------------------------------
+ */
+(function () {
+  "use strict";
+
+  function linspace(a, b, n) {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1));
+    return out;
+  }
+
+  window.RiseFall = {
+    /**
+     * opts: {
+     *   vcc,               // supply / logic swing (V)
+     *   cload,             // external load cap the times were measured at (F)
+     *   tr, tf,            // rise / fall time (s)
+     *   edge,              // "20-80" or "10-90" -> fraction of swing spanned
+     *   ccomp              // pin C_comp (F), user-provided or default
+     * }
+     */
+    generate: function (opts) {
+      const vcc = opts.vcc;
+      const frac = opts.edge === "10-90" ? 0.8 : 0.6;   // both span 0.8 or 0.6 of swing
+      const dv = frac * vcc;
+
+      // Effective average drive current that slews cload through dv in tr/tf:
+      //   I_avg = Cload * dv / t
+      const iUp = opts.cload * dv / Math.max(opts.tr, 1e-15);
+      const iDn = opts.cload * dv / Math.max(opts.tf, 1e-15);
+
+      // Model each driver as a linear on-resistance sized so that at
+      // mid-rail it sources/sinks I_avg:  Ron = (Vcc/2) / I_avg.
+      const ronUp = (vcc / 2) / Math.max(iUp, 1e-12);
+      const ronDn = (vcc / 2) / Math.max(iDn, 1e-12);
+
+      const vs = linspace(-vcc, 2 * vcc, 25);
+
+      // Pulldown: linear sink, I = Vout / Ron for Vout in [0, Vcc], flat beyond.
+      const pulldown = vs.map(function (v) {
+        let vd = v;
+        if (vd < 0) vd = 0;
+        if (vd > vcc) vd = vcc;
+        const i = vd / ronDn;
+        return { v: v, typ: i, min: i * 0.8, max: i * 1.2 };
+      });
+
+      // Pullup: referenced to Vcc, I = Vtable / Ron for Vtable in [0, Vcc].
+      const pullup = vs.map(function (v) {
+        let vt = v;
+        if (vt < 0) vt = 0;
+        if (vt > vcc) vt = vcc;
+        const i = vt / ronUp;
+        return { v: v, typ: i, min: i * 0.8, max: i * 1.2 };
+      });
+
+      const ccomp = opts.ccomp || 2e-12;
+
+      // Ramp comes straight from the measured edges (the good part).
+      const dtr = opts.tr, dtf = opts.tf;
+
+      return {
+        pulldown: pulldown,
+        pullup: pullup,
+        gndClamp: [],
+        powerClamp: [],
+        ccomp: { typ: ccomp, min: ccomp * 0.85, max: ccomp * 1.15 },
+        ramp: {
+          dvr: dv, dvf: dv, rload: 50,
+          dtr: { typ: dtr, min: dtr * 0.8, max: dtr * 1.2 },
+          dtf: { typ: dtf, min: dtf * 0.8, max: dtf * 1.2 }
+        },
+        meta: { ronUp: ronUp, ronDn: ronDn, iUp: iUp, iDn: iDn }
+      };
+    }
+  };
+})();
+
+</script>
+<script>
+/*
+ * netlist.js
+ * ------------------------------------------------------------------
+ * Adapter (stage 1): parse a pasted SPICE netlist of an I/O buffer,
+ * auto-detect the PAD (I/O) net, the supply rails, and the output-
+ * stage transistor W/L. The parsed W/L then feeds the square-law
+ * engine, so this is the same ballpark-accuracy path as the manual
+ * W/L tab -- it just reads the geometry off your netlist for you.
+ *
+ * PAD auto-detection heuristic (strongest signal first):
+ *   1. A net that is the DRAIN of at least one NMOS *and* one PMOS
+ *      (the classic push-pull output node) and is not a supply.
+ *   2. Failing that, a net whose name looks like a pad/pin (pad, out,
+ *      io, y, z, pin, ...).
+ * ------------------------------------------------------------------
+ */
+(function () {
+  "use strict";
+
+  const SUPPLY_HI = /^(vdd|vcc|vpwr|vddd|vdda|vccd|vcca|vpb|vp)$/i;
+  const SUPPLY_LO = /^(vss|gnd|vgnd|vssd|vssa|vnb|vn|0)$/i;
+  const PAD_NAME  = /^(pad|out|output|io|dq|y|z|pin|q|o)$/i;
+  const IN_NAME   = /^(in|input|a|d|data|din)$/i;
+
+  const SI = { f: 1e-15, p: 1e-12, n: 1e-9, u: 1e-6, "µ": 1e-6, m: 1e-3, k: 1e3, meg: 1e6, g: 1e9, t: 1e12 };
+
+  // Parse a SPICE value like "0.42u", "1e-6", "150n" -> number (SI base).
+  function val(s) {
+    if (s == null) return NaN;
+    s = String(s).trim();
+    const m = s.match(/^([+-]?[0-9.]+(?:[eE][+-]?[0-9]+)?)(meg|[fpnumkgtµ])?/);
+    if (!m) return NaN;
+    let x = parseFloat(m[1]);
+    if (m[2]) x *= SI[m[2].toLowerCase()] || 1;
+    return x;
+  }
+
+  function typeOf(model) {
+    const s = model.toLowerCase();
+    if (/nfet|nmos|_n_|(^|_)n(fet|mos|ch)/.test(s) || /nfet|nmos/.test(s)) return "N";
+    if (/pfet|pmos|_p_|(^|_)p(fet|mos|ch)/.test(s) || /pfet|pmos/.test(s)) return "P";
+    // fall back on a leading letter after last '__' e.g. sky130_fd_pr__nfet_01v8
+    if (/nfet/.test(s)) return "N";
+    if (/pfet/.test(s)) return "P";
+    return null;
+  }
+
+  window.Netlist = {
+    /**
+     * Parse netlist text. Returns:
+     * {
+     *   devices: [{name,type:"N"|"P",d,g,s,b,model,w,l,wl}],
+     *   nets: [string...],
+     *   supplies: {hi:[...], lo:[...]},
+     *   guess: { pad, vdd, gnd, input },
+     *   output: { pad, nDev, pDev, nWL, pWL }   // strongest push-pull node
+     *   warnings: [string...]
+     * }
+     */
+    parse: function (text) {
+      const warnings = [];
+      const devices = [];
+      const netSet = {};
+
+      // Join continuation lines (leading '+'), strip comments.
+      const raw = text.replace(/\r/g, "").split("\n");
+      const lines = [];
+      raw.forEach(function (ln) {
+        const t = ln.replace(/\*.*$/, "").trimEnd();     // '*' comment
+        if (/^\s*\+/.test(t) && lines.length) lines[lines.length - 1] += " " + t.replace(/^\s*\+/, "");
+        else lines.push(t);
+      });
+
+      lines.forEach(function (ln) {
+        const s = ln.trim();
+        if (!s || /^[.*]/.test(s)) return;                // skip .subckt/.model/etc & comments
+        const first = s[0].toUpperCase();
+        if (first !== "M" && first !== "X") return;        // only devices
+
+        const tok = s.split(/\s+/);
+        const name = tok[0];
+        // split into non-param tokens and params (contain '=')
+        const nonParam = [], params = {};
+        for (let i = 1; i < tok.length; i++) {
+          const eq = tok[i].indexOf("=");
+          if (eq > 0) params[tok[i].slice(0, eq).toLowerCase()] = tok[i].slice(eq + 1);
+          else nonParam.push(tok[i]);
+        }
+        if (nonParam.length < 2) return;
+        const model = nonParam[nonParam.length - 1];       // model = last non-param token
+        const nodes = nonParam.slice(0, nonParam.length - 1);
+        const type = typeOf(model);
+        if (!type) return;                                 // not a recognizable MOSFET
+        if (nodes.length < 3) return;
+
+        const w = val(params.w), l = val(params.l);
+        nodes.forEach(function (n) { netSet[n] = true; });
+        devices.push({
+          name: name, type: type,
+          d: nodes[0], g: nodes[1], s: nodes[2], b: nodes[3] || nodes[2],
+          model: model, w: w, l: l,
+          wl: (isFinite(w) && isFinite(l) && l > 0) ? w / l : NaN
+        });
+      });
+
+      if (!devices.length) warnings.push("No MOSFET (M... or X...nfet/pfet...) devices found. Check the netlist format.");
+
+      const nets = Object.keys(netSet);
+      const supplies = { hi: nets.filter(function (n) { return SUPPLY_HI.test(n); }),
+                         lo: nets.filter(function (n) { return SUPPLY_LO.test(n); }) };
+      const isSupply = function (n) { return SUPPLY_HI.test(n) || SUPPLY_LO.test(n); };
+
+      // --- PAD detection: drain of both an NMOS and a PMOS ---
+      const nDrain = {}, pDrain = {};
+      devices.forEach(function (dv) {
+        if (dv.type === "N") nDrain[dv.d] = (nDrain[dv.d] || 0) + 1;
+        else pDrain[dv.d] = (pDrain[dv.d] || 0) + 1;
+      });
+      let padCandidates = nets.filter(function (n) { return nDrain[n] && pDrain[n] && !isSupply(n); });
+      // Prefer one whose name looks like a pad
+      let pad = padCandidates.find(function (n) { return PAD_NAME.test(n); }) || padCandidates[0];
+      if (!pad) {
+        pad = nets.find(function (n) { return PAD_NAME.test(n) && !isSupply(n); }) || null;
+        if (pad) warnings.push("Could not find a push-pull output node; guessed PAD by name ('" + pad + "').");
+        else warnings.push("Could not auto-detect the PAD net. Please select it manually.");
+      }
+
+      // Output devices on the PAD (largest-W driver of each type).
+      function biggestOn(pad, type) {
+        const cands = devices.filter(function (d) { return d.type === type && d.d === pad; });
+        cands.sort(function (a, b) { return (b.w || 0) - (a.w || 0); });
+        return cands[0] || null;
+      }
+      const nDev = pad ? biggestOn(pad, "N") : null;
+      const pDev = pad ? biggestOn(pad, "P") : null;
+
+      // Input net: gate shared by the output devices, if it looks like an input.
+      let input = null;
+      if (nDev && pDev && nDev.g === pDev.g) input = nDev.g;   // shared output gate: strongest
+      else if (nDev) input = nDev.g;
+      if (!input) input = nets.find(function (n) { return IN_NAME.test(n); }) || null;
+
+      return {
+        devices: devices,
+        nets: nets,
+        supplies: supplies,
+        guess: {
+          pad: pad,
+          vdd: supplies.hi[0] || null,
+          gnd: supplies.lo[0] || null,
+          input: input
+        },
+        output: {
+          pad: pad,
+          nDev: nDev, pDev: pDev,
+          nWL: nDev ? nDev.wl : NaN,
+          pWL: pDev ? pDev.wl : NaN
+        },
+        warnings: warnings
+      };
+    }
+  };
+})();
+
+</script>
+<script>
+/*
+ * validate.js
+ * ------------------------------------------------------------------
+ * Lightweight sanity checks on the assembled model data. This is NOT
+ * the golden IBIS parser (ibischk) -- it catches the common gross
+ * errors that make a model unusable or obviously wrong.
+ * ------------------------------------------------------------------
+ */
+(function () {
+  "use strict";
+
+  function checkMonotonic(name, rows, out) {
+    if (!rows || !rows.length) return;
+    let prev = null, mono = true;
+    for (let i = 0; i < rows.length; i++) {
+      if (prev !== null && rows[i].typ < prev - 1e-12) mono = false;
+      prev = rows[i].typ;
+    }
+    if (!mono) out.warn.push(name + " I-V table is not monotonic; some board simulators dislike this.");
+  }
+
+  window.Validate = {
+    run: function (d) {
+      const out = { ok: [], warn: [], err: [] };
+      const m = d.model;
+
+      if (!m.name) out.err.push("Model has no name.");
+      if (!(m.vcc > 0)) out.err.push("Voltage range invalid (Vcc must be > 0).");
+      if (m.vinl >= m.vinh) out.err.push("Vinl must be less than Vinh.");
+      if (!d.pins.length) out.err.push("No pins defined.");
+
+      if (m.ccomp && m.ccomp.typ > 20e-12)
+        out.warn.push("C_comp (" + (m.ccomp.typ * 1e12).toFixed(1) + " pF) is unusually large for a signal pin.");
+      if (m.ccomp && m.ccomp.typ <= 0)
+        out.err.push("C_comp must be positive.");
+
+      checkMonotonic("Pulldown", m.pulldown, out);
+      checkMonotonic("Pullup", m.pullup, out);
+
+      // Sanity: is there any drive at all?
+      const maxPd = (m.pulldown || []).reduce(function (a, r) { return Math.max(a, r.typ); }, 0);
+      const maxPu = (m.pullup || []).reduce(function (a, r) { return Math.max(a, r.typ); }, 0);
+      if (maxPd < 1e-6) out.warn.push("Pulldown drive is essentially zero -- check W/L or inputs.");
+      if (maxPu < 1e-6) out.warn.push("Pullup drive is essentially zero -- check W/L or inputs.");
+      if (maxPd > 1) out.warn.push("Pulldown peak current > 1 A -- likely an unrealistic W/L for square-law.");
+
+      if (m.ramp) {
+        if (!(m.ramp.dtr.typ > 0) || !(m.ramp.dtf.typ > 0))
+          out.err.push("Ramp time must be positive.");
+      }
+
+      if (!out.err.length && !out.warn.length) out.ok.push("No issues found by the built-in checks.");
+      return out;
+    }
+  };
+})();
+
+</script>
+<script>
+/*
+ * app.js -- UI wiring for the IBIS Model Builder.
+ * Reads the DOM, dispatches to the active input adapter, assembles the
+ * .ibs via IBIS.build, validates, and renders / downloads the result.
+ */
+(function () {
+  "use strict";
+
+  const $ = function (id) { return document.getElementById(id); };
+  const num = function (id) { return parseFloat($(id).value); };
+
+  let activeTab = "wl";
+  let lastText = "";
+
+  // ---- Populate process-node dropdown ----
+  const nodeSel = $("node");
+  Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
+    const o = document.createElement("option");
+    o.value = key;
+    o.textContent = window.PROCESS_LIBRARY[key].label;
+    nodeSel.appendChild(o);
+  });
+  nodeSel.value = "sky130";
+
+  // Mirror the node list into the netlist tab's own selector.
+  const netNodeSel = $("net_node");
+  Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
+    const o = document.createElement("option");
+    o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
+    netNodeSel.appendChild(o);
+  });
+  netNodeSel.value = "sky130";
+
+  function loadNodeParams() {
+    const p = window.PROCESS_LIBRARY[nodeSel.value];
+    $("nodeNote").textContent = p.note;
+    $("p_vdd").value = p.vdd;
+    $("p_vthn").value = p.vthn;
+    $("p_vthp").value = p.vthp;
+    $("p_kpn").value = p.kpn;
+    $("p_kpp").value = p.kpp;
+    $("p_ln").value = p.lambdan;
+    $("p_lp").value = p.lambdap;
+    $("p_cox").value = p.cox;
+  }
+  nodeSel.addEventListener("change", loadNodeParams);
+  loadNodeParams();
+
+  // ---- Tab switching ----
+  document.querySelectorAll(".tab").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      activeTab = btn.dataset.tab;
+      document.querySelectorAll(".tab").forEach(function (b) { b.classList.remove("active"); });
+      document.querySelectorAll(".panel").forEach(function (p) { p.classList.remove("active"); });
+      btn.classList.add("active");
+      $("panel-" + activeTab).classList.add("active");
+    });
+  });
+
+  // ---- Shared model scaffold from the common form ----
+  function baseModel() {
+    return {
+      component: $("component").value.trim() || "MyChip",
+      manufacturer: $("manufacturer").value.trim() || "Unknown",
+      pkg: { r: num("rpkg"), l: num("lpkg"), c: num("cpkg") },
+      model: {
+        name: $("modelName").value.trim() || "buf_io",
+        type: $("modelType").value,
+        polarity: "Non-Inverting",
+        enable: "Active-High",
+        vinl: num("vinl"), vinh: num("vinh"),
+        tempTyp: num("ttyp"), tempMin: num("tmin"), tempMax: num("tmax"),
+        rpin: num("rpin"), lpin: num("lpin"), cpin: num("cpin")
+      },
+      pins: parsePins()
+    };
+  }
+
+  function parsePins() {
+    const model = $("modelName").value.trim() || "buf_io";
+    const lines = $("pins").value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+    if (!lines.length) return [{ num: "1", name: "PIN1", model: model }];
+    return lines.map(function (l) {
+      const parts = l.split(/[\s,]+/);
+      return { num: parts[0], name: parts[1] || ("PIN" + parts[0]), model: model };
+    });
+  }
+
+  function parseCSV(text) {
+    return text.split("\n").map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+      const parts = l.split(/[\s,]+/).map(parseFloat);
+      const i = parts[1];
+      return { v: parts[0], typ: i, min: i * 0.8, max: i * 1.2 };
+    }).filter(function (r) { return isFinite(r.v) && isFinite(r.typ); });
+  }
+
+  // ---- Adapters -> fill model electrical data ----
+  function buildFromWL(d) {
+    const params = {
+      vdd: num("p_vdd"), vthn: num("p_vthn"), vthp: num("p_vthp"),
+      kpn: num("p_kpn"), kpp: num("p_kpp"),
+      lambdan: num("p_ln"), lambdap: num("p_lp"), cox: num("p_cox")
+    };
+    const ccompOv = $("wlCcomp").value ? num("wlCcomp") * 1e-12 : null;
+    const r = window.SquareLaw.generate({
+      params: params, wlN: num("wlN"), wlP: num("wlP"), ccomp: ccompOv
+    });
+    applyElectrical(d, params.vdd, r);
+    d.provenance = "Square-law estimate. node=" + nodeSel.value +
+      ", W/L(n)=" + num("wlN") + ", W/L(p)=" + num("wlP") + ", Vcc=" + params.vdd + "V.";
+  }
+
+  function buildFromRF(d) {
+    const vcc = num("rf_vcc");
+    const r = window.RiseFall.generate({
+      vcc: vcc, cload: num("rf_cload") * 1e-12,
+      tr: num("rf_tr") * 1e-9, tf: num("rf_tf") * 1e-9,
+      edge: $("rf_edge").value, ccomp: num("rf_ccomp") * 1e-12
+    });
+    applyElectrical(d, vcc, r);
+    d.provenance = "Reconstructed from measured edges: tr=" + num("rf_tr") +
+      "ns, tf=" + num("rf_tf") + "ns @ Cload=" + num("rf_cload") + "pF, Vcc=" + vcc + "V.";
+  }
+
+  function buildFromPaste(d) {
+    const vcc = num("ps_vcc");
+    const ccomp = num("ps_ccomp") * 1e-12;
+    const dv = 0.6 * vcc;
+    const r = {
+      pulldown: parseCSV($("ps_pd").value),
+      pullup: parseCSV($("ps_pu").value),
+      gndClamp: [], powerClamp: [],
+      ccomp: { typ: ccomp, min: ccomp * 0.85, max: ccomp * 1.15 },
+      ramp: {
+        dvr: dv, dvf: dv, rload: 50,
+        dtr: mm(num("ps_tr") * 1e-9), dtf: mm(num("ps_tf") * 1e-9)
+      }
+    };
+    applyElectrical(d, vcc, r);
+    d.provenance = "Assembled from user-supplied I-V data and edge rates, Vcc=" + vcc + "V.";
+  }
+
+  function mm(x) { return { typ: x, min: x * 0.8, max: x * 1.2 }; }
+
+  // ---- Netlist tab: parse + populate config ----
+  let netParsed = null;
+
+  function fillSelect(sel, nets, chosen) {
+    sel.innerHTML = "";
+    nets.forEach(function (n) {
+      const o = document.createElement("option");
+      o.value = n; o.textContent = n;
+      if (n === chosen) o.selected = true;
+      sel.appendChild(o);
+    });
+    // allow an empty choice when nothing detected
+    if (!chosen) { const o = document.createElement("option"); o.value = ""; o.textContent = "(none)"; o.selected = true; sel.insertBefore(o, sel.firstChild); }
+  }
+
+  $("parseNet").addEventListener("click", function () {
+    const r = window.Netlist.parse($("net_text").value);
+    netParsed = r;
+    // warnings
+    const wbox = $("netWarn"); wbox.innerHTML = "";
+    r.warnings.forEach(function (t) {
+      const div = document.createElement("div");
+      div.className = "vmsg warn"; div.textContent = "⚠ " + t; wbox.appendChild(div);
+    });
+    if (r.devices.length) {
+      const div = document.createElement("div");
+      div.className = "vmsg ok";
+      div.textContent = "✔ Parsed " + r.devices.length + " device(s); " + r.nets.length + " nets.";
+      wbox.appendChild(div);
+    }
+    fillSelect($("net_pad"), r.nets, r.guess.pad);
+    fillSelect($("net_vdd"), r.nets, r.guess.vdd);
+    fillSelect($("net_gnd"), r.nets, r.guess.gnd);
+    fillSelect($("net_in"),  r.nets, r.guess.input);
+    $("net_wlN").value = isFinite(r.output.nWL) ? +r.output.nWL.toFixed(3) : "";
+    $("net_wlP").value = isFinite(r.output.pWL) ? +r.output.pWL.toFixed(3) : "";
+    const info = [];
+    if (r.output.nDev) info.push("Pulldown: " + r.output.nDev.name + " (W/L=" + fmtWL(r.output.nDev) + ")");
+    if (r.output.pDev) info.push("Pullup: " + r.output.pDev.name + " (W/L=" + fmtWL(r.output.pDev) + ")");
+    $("net_devinfo").textContent = info.join("  ·  ");
+    $("netResult").hidden = false;
+  });
+
+  function fmtWL(dv) {
+    if (!isFinite(dv.wl)) return "?";
+    return (dv.w * 1e6).toFixed(2) + "u / " + (dv.l * 1e6).toFixed(3) + "u = " + dv.wl.toFixed(2);
+  }
+
+  function buildFromNet(d) {
+    if (!netParsed) throw new Error("Click “Parse & auto-detect PAD” first.");
+    const base = window.PROCESS_LIBRARY[netNodeSel.value];
+    const params = {
+      vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
+      kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
+    };
+    const wlN = parseFloat($("net_wlN").value), wlP = parseFloat($("net_wlP").value);
+    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W/L manually.");
+    const ccompOv = $("net_ccomp").value ? parseFloat($("net_ccomp").value) * 1e-12 : null;
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    applyElectrical(d, params.vdd, r);
+    d.provenance = "Parsed from SPICE netlist. PAD=" + $("net_pad").value +
+      ", VDD=" + $("net_vdd").value + ", GND=" + $("net_gnd").value +
+      "; square-law on node=" + netNodeSel.value + ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
+  }
+
+  function applyElectrical(d, vcc, r) {
+    const m = d.model;
+    m.vcc = vcc;
+    m.vccMin = +(vcc * 0.9).toFixed(4);
+    m.vccMax = +(vcc * 1.1).toFixed(4);
+    m.ccomp = r.ccomp;
+    m.pulldown = r.pulldown;
+    m.pullup = r.pullup;
+    m.gndClamp = r.gndClamp;
+    m.powerClamp = r.powerClamp;
+    m.ramp = r.ramp;
+  }
+
+  // ---- Validation rendering ----
+  function renderValidation(v) {
+    const box = $("validation");
+    box.innerHTML = "";
+    function block(cls, items, icon) {
+      items.forEach(function (t) {
+        const div = document.createElement("div");
+        div.className = "vmsg " + cls;
+        div.textContent = icon + " " + t;
+        box.appendChild(div);
+      });
+    }
+    block("err", v.err, "✖");
+    block("warn", v.warn, "⚠");
+    block("ok", v.ok, "✔");
+  }
+
+  // ---- Generate ----
+  $("generate").addEventListener("click", function () {
+    try {
+      const d = baseModel();
+      if (activeTab === "wl") buildFromWL(d);
+      else if (activeTab === "rf") buildFromRF(d);
+      else if (activeTab === "net") buildFromNet(d);
+      else buildFromPaste(d);
+
+      const v = window.Validate.run(d);
+      renderValidation(v);
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      lastText = window.IBIS.build(d, dateStr);
+      $("output").textContent = lastText;
+      $("outCard").hidden = false;
+      $("outCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) {
+      alert("Could not generate model: " + e.message);
+      console.error(e);
+    }
+  });
+
+  // ---- Download / copy ----
+  $("download").addEventListener("click", function () {
+    if (!lastText) return;
+    const name = ($("component").value.trim() || "model").toLowerCase().replace(/[^a-z0-9_]/g, "_") + ".ibs";
+    const blob = new Blob([lastText], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $("copy").addEventListener("click", function () {
+    if (!lastText) return;
+    navigator.clipboard.writeText(lastText).then(function () {
+      const b = $("copy"); const old = b.textContent;
+      b.textContent = "Copied!"; setTimeout(function () { b.textContent = old; }, 1200);
+    });
+  });
+})();
+
+</script>
+</body>
+</html>

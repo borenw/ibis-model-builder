@@ -11,9 +11,19 @@ There is no modern web front-end for building IBIS models; the classic free tool
 | **Device W/L + process** | NMOS/PMOS W/L ratios + a process node (incl. **SkyWater sky130**) | ⭐ Ballpark — square-law physics |
 | **Rise / Fall @ load** | Measured/simulated edge rates at a known load cap | ⭐⭐⭐ Real behavioral data |
 | **Paste I‑V / V‑t** | Raw pullup/pulldown I‑V points + edge rates | ⭐⭐⭐⭐ Whatever you feed it |
+| **Paste SPICE netlist** | A netlist of your buffer — it **auto-detects the PAD** net and pulls the output-stage W/L for you | ⭐ Ballpark — square-law on the extracted geometry |
 
-All three feed **one** IBIS assembler core, so the output format is identical
+All four feed **one** IBIS assembler core, so the output format is identical
 regardless of input.
+
+### PAD auto-detection
+
+Paste a SPICE netlist and the tool finds the I/O pin for you: the **PAD is the
+net that is the drain of both an output NMOS and an output PMOS** (the push-pull
+node). Supply rails (`VDD/VCC/VPWR/…`, `VSS/GND/VGND/…`) and the input net are
+detected by role and name. Every guess is shown in a dropdown you can override.
+Works with plain `M...` devices and SkyWater `X...nfet/pfet...` subckt devices,
+including `+` continuation lines.
 
 ## ⚠️ Accuracy disclaimer
 
@@ -28,15 +38,31 @@ This tool produces a **first-order estimate**, not silicon-validated data.
   [`ibischk`](https://ibis.org/tools/) and correlate against SPICE or measurement
   before using a model for real board sign-off.
 
-## Usage
+## Usage — pick the easiest for you
 
-Just open `index.html` in a browser — no build step, no server, no install.
+**① Zero-install, online (one click):** just open the hosted page —
+👉 **https://borenw.github.io/ibis-model-builder/** — nothing to download.
 
-Or host it as a static site (e.g. GitHub Pages) and use it online.
+**② One self-contained file (offline, one click):** grab
+[`dist/ibis-model-builder.html`](dist/ibis-model-builder.html), download it, and
+**double-click**. Everything (HTML + CSS + JS) is inlined into that single file —
+no server, no install, works with no internet.
+
+**③ From source:** open `index.html` in a browser (no build step needed to run).
+
+Then, in any of the above:
 
 1. Fill in the component/model basics and your pin list.
-2. Pick an input tab and enter your data.
+2. Pick an input tab and enter your data (or paste a netlist and hit **Parse**).
 3. Click **Generate** → review the built-in sanity checks → **Download `.ibs`**.
+
+### Rebuilding the single-file bundle
+
+The standalone file is generated from source by inlining every asset:
+
+```
+python3 build.py     # -> dist/ibis-model-builder.html
+```
 
 ## Process library
 
@@ -55,8 +81,11 @@ js/process-library.js   per-node square-law parameters (incl. sky130)
 js/ibis-core.js         the assembler: normalized data -> .ibs text
 js/square-law.js        adapter: W/L + process -> model data
 js/risefall.js          adapter: rise/fall @ Cload -> model data
+js/netlist.js           adapter: SPICE netlist -> PAD/W/L -> model data
 js/validate.js          lightweight sanity checks (not ibischk)
 js/app.js               DOM wiring
+build.py                inlines everything -> dist/ibis-model-builder.html
+dist/                   the single-file, double-click-to-run bundle
 ```
 
 Each input adapter produces the same normalized model-data object; `ibis-core.js`

@@ -22,6 +22,15 @@
   });
   nodeSel.value = "sky130";
 
+  // Mirror the node list into the netlist tab's own selector.
+  const netNodeSel = $("net_node");
+  Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
+    const o = document.createElement("option");
+    o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
+    netNodeSel.appendChild(o);
+  });
+  netNodeSel.value = "sky130";
+
   function loadNodeParams() {
     const p = window.PROCESS_LIBRARY[nodeSel.value];
     $("nodeNote").textContent = p.note;
@@ -133,6 +142,71 @@
 
   function mm(x) { return { typ: x, min: x * 0.8, max: x * 1.2 }; }
 
+  // ---- Netlist tab: parse + populate config ----
+  let netParsed = null;
+
+  function fillSelect(sel, nets, chosen) {
+    sel.innerHTML = "";
+    nets.forEach(function (n) {
+      const o = document.createElement("option");
+      o.value = n; o.textContent = n;
+      if (n === chosen) o.selected = true;
+      sel.appendChild(o);
+    });
+    // allow an empty choice when nothing detected
+    if (!chosen) { const o = document.createElement("option"); o.value = ""; o.textContent = "(none)"; o.selected = true; sel.insertBefore(o, sel.firstChild); }
+  }
+
+  $("parseNet").addEventListener("click", function () {
+    const r = window.Netlist.parse($("net_text").value);
+    netParsed = r;
+    // warnings
+    const wbox = $("netWarn"); wbox.innerHTML = "";
+    r.warnings.forEach(function (t) {
+      const div = document.createElement("div");
+      div.className = "vmsg warn"; div.textContent = "⚠ " + t; wbox.appendChild(div);
+    });
+    if (r.devices.length) {
+      const div = document.createElement("div");
+      div.className = "vmsg ok";
+      div.textContent = "✔ Parsed " + r.devices.length + " device(s); " + r.nets.length + " nets.";
+      wbox.appendChild(div);
+    }
+    fillSelect($("net_pad"), r.nets, r.guess.pad);
+    fillSelect($("net_vdd"), r.nets, r.guess.vdd);
+    fillSelect($("net_gnd"), r.nets, r.guess.gnd);
+    fillSelect($("net_in"),  r.nets, r.guess.input);
+    $("net_wlN").value = isFinite(r.output.nWL) ? +r.output.nWL.toFixed(3) : "";
+    $("net_wlP").value = isFinite(r.output.pWL) ? +r.output.pWL.toFixed(3) : "";
+    const info = [];
+    if (r.output.nDev) info.push("Pulldown: " + r.output.nDev.name + " (W/L=" + fmtWL(r.output.nDev) + ")");
+    if (r.output.pDev) info.push("Pullup: " + r.output.pDev.name + " (W/L=" + fmtWL(r.output.pDev) + ")");
+    $("net_devinfo").textContent = info.join("  ·  ");
+    $("netResult").hidden = false;
+  });
+
+  function fmtWL(dv) {
+    if (!isFinite(dv.wl)) return "?";
+    return (dv.w * 1e6).toFixed(2) + "u / " + (dv.l * 1e6).toFixed(3) + "u = " + dv.wl.toFixed(2);
+  }
+
+  function buildFromNet(d) {
+    if (!netParsed) throw new Error("Click “Parse & auto-detect PAD” first.");
+    const base = window.PROCESS_LIBRARY[netNodeSel.value];
+    const params = {
+      vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
+      kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
+    };
+    const wlN = parseFloat($("net_wlN").value), wlP = parseFloat($("net_wlP").value);
+    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W/L manually.");
+    const ccompOv = $("net_ccomp").value ? parseFloat($("net_ccomp").value) * 1e-12 : null;
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    applyElectrical(d, params.vdd, r);
+    d.provenance = "Parsed from SPICE netlist. PAD=" + $("net_pad").value +
+      ", VDD=" + $("net_vdd").value + ", GND=" + $("net_gnd").value +
+      "; square-law on node=" + netNodeSel.value + ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
+  }
+
   function applyElectrical(d, vcc, r) {
     const m = d.model;
     m.vcc = vcc;
@@ -169,6 +243,7 @@
       const d = baseModel();
       if (activeTab === "wl") buildFromWL(d);
       else if (activeTab === "rf") buildFromRF(d);
+      else if (activeTab === "net") buildFromNet(d);
       else buildFromPaste(d);
 
       const v = window.Validate.run(d);
