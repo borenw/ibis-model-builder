@@ -10,7 +10,7 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v2.2";
+  const APP_REV = "v2.3";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "cad";
@@ -125,6 +125,19 @@
     return (w > 0 && l > 0) ? w / l : NaN;
   }
   function fmtRatio(x) { return isFinite(x) ? (x >= 100 ? x.toFixed(0) : x.toFixed(2)) : "?"; }
+
+  // Derived driver on-resistance from an I-V table: the near-rail slope
+  // dV/dI in the low-voltage (triode) region. This is the "resistance"
+  // an SI engineer reads off the pull-up/pull-down curve.
+  function ronOf(tbl, vcc) {
+    if (!tbl || tbl.length < 2 || !(vcc > 0)) return NaN;
+    const pts = tbl.filter(function (p) { return p.v > 1e-9 && p.v <= 0.5 * vcc && p.typ > 0; })
+                   .sort(function (a, b) { return a.v - b.v; });
+    if (pts.length < 1) return NaN;
+    const a = pts[0], b = pts[pts.length - 1];
+    const dI = b.typ - a.typ;
+    return dI > 1e-12 ? (b.v - a.v) / dI : a.v / a.typ;
+  }
 
   // ---- Standard pad-ring cap (bond pad + ESD) per process ----
   function cpadOf(sel) { const e = sel && window.PROCESS_LIBRARY[sel.value]; return e ? e.cpad : 0.5e-12; }
@@ -605,6 +618,7 @@
       tr: mo.ramp ? mo.ramp.dtr.typ : NaN, tf: mo.ramp ? mo.ramp.dtf.typ : NaN,
       clamps: !!(mo.gndClamp && mo.gndClamp.length),
       pkg: { r: m.pkg.r, l: m.pkg.l, c: m.pkg.c },
+      ronPu: ronOf(mo.pullup, mo.vcc), ronPd: ronOf(mo.pulldown, mo.vcc),
       puLabel: L.pu, pdLabel: L.pd,
       ivPullup: mo.pullup, ivPulldown: mo.pulldown,
       note: L.note
@@ -620,6 +634,9 @@
     try {
       const d = baseModel();
       dispatchBuild(d);
+
+      d.model.ronPd = ronOf(d.model.pulldown, d.model.vcc);
+      d.model.ronPu = ronOf(d.model.pullup, d.model.vcc);
 
       const v = window.Validate.run(d);
       renderValidation(v);

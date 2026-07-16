@@ -164,12 +164,14 @@
     g += txt(46, PADy + 4, "IN", "rail");
 
     // labels for the two devices (colored to match their I-V curve)
-    g += txt(colX + 12, 108, "PMOS pull-up", "t-pu");
-    g += txt(colX + 12, 124, data.puLabel || "", "sub");
-    g += txt(colX + 12, 140, "I_pk " + eng(data.peakPu, "A"), "sub");
-    g += txt(colX + 12, 308, "NMOS pull-down", "t-pd");
-    g += txt(colX + 12, 324, data.pdLabel || "", "sub");
-    g += txt(colX + 12, 340, "I_pk " + eng(data.peakPd, "A"), "sub");
+    g += txt(colX + 12, 104, "PMOS pull-up", "t-pu");
+    g += txt(colX + 12, 120, data.puLabel || "", "sub");
+    g += txt(colX + 12, 136, "I_pk " + eng(data.peakPu, "A"), "sub");
+    g += txt(colX + 12, 152, "R_on " + eng(data.ronPu, "Ω"), "sub");
+    g += txt(colX + 12, 300, "NMOS pull-down", "t-pd");
+    g += txt(colX + 12, 316, data.pdLabel || "", "sub");
+    g += txt(colX + 12, 332, "I_pk " + eng(data.peakPd, "A"), "sub");
+    g += txt(colX + 12, 348, "R_on " + eng(data.ronPd, "Ω"), "sub");
 
     // PAD horizontal wire out to package/pin
     g += wire(colX, PADy, 380, PADy);

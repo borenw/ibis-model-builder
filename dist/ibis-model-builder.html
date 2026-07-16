@@ -751,6 +751,12 @@ window.PROCESS_LIBRARY = {
     return (x >= 0 ? " " : "") + x.toFixed(4);
   }
 
+  function ohms(x) {
+    if (x == null || !isFinite(x)) return "n/a";
+    if (x >= 1000) return (x / 1000).toFixed(2) + " kohm";
+    return x.toFixed(1) + " ohm";
+  }
+
   function pad(s, n) {
     s = String(s);
     return s.length >= n ? s : s + " ".repeat(n - s.length);
@@ -821,6 +827,13 @@ window.PROCESS_LIBRARY = {
       s += "|\n";
       s += "[Voltage Range]  " + m.vcc + "\t" + m.vccMin + "\t" + m.vccMax + "\n";
       s += "[Temperature Range] " + m.tempTyp + "\t" + m.tempMin + "\t" + m.tempMax + "\n";
+      if (isFinite(m.ronPd) || isFinite(m.ronPu)) {
+        s += "|\n";
+        s += "| Derived driver output impedance (near-rail slope dV/dI of the I-V tables):\n";
+        s += "|   Pulldown R_on ~ " + ohms(m.ronPd) + "     Pullup R_on ~ " + ohms(m.ronPu) + "\n";
+        s += "| NOTE: informational only -- IBIS carries no driver resistance; the drive\n";
+        s += "|       is the [Pulldown]/[Pullup] I-V tables below. R = V/I along the curve.\n";
+      }
       s += "\n";
 
       if (m.pulldown && m.pulldown.length)   s += ivTable("Pulldown", m.pulldown) + "\n";
@@ -1417,12 +1430,14 @@ window.PROCESS_LIBRARY = {
     g += txt(46, PADy + 4, "IN", "rail");
 
     // labels for the two devices (colored to match their I-V curve)
-    g += txt(colX + 12, 108, "PMOS pull-up", "t-pu");
-    g += txt(colX + 12, 124, data.puLabel || "", "sub");
-    g += txt(colX + 12, 140, "I_pk " + eng(data.peakPu, "A"), "sub");
-    g += txt(colX + 12, 308, "NMOS pull-down", "t-pd");
-    g += txt(colX + 12, 324, data.pdLabel || "", "sub");
-    g += txt(colX + 12, 340, "I_pk " + eng(data.peakPd, "A"), "sub");
+    g += txt(colX + 12, 104, "PMOS pull-up", "t-pu");
+    g += txt(colX + 12, 120, data.puLabel || "", "sub");
+    g += txt(colX + 12, 136, "I_pk " + eng(data.peakPu, "A"), "sub");
+    g += txt(colX + 12, 152, "R_on " + eng(data.ronPu, "Ω"), "sub");
+    g += txt(colX + 12, 300, "NMOS pull-down", "t-pd");
+    g += txt(colX + 12, 316, data.pdLabel || "", "sub");
+    g += txt(colX + 12, 332, "I_pk " + eng(data.peakPd, "A"), "sub");
+    g += txt(colX + 12, 348, "R_on " + eng(data.ronPd, "Ω"), "sub");
 
     // PAD horizontal wire out to package/pin
     g += wire(colX, PADy, 380, PADy);
@@ -1709,7 +1724,7 @@ window.PROCESS_LIBRARY = {
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v2.2";
+  const APP_REV = "v2.3";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "cad";
@@ -1824,6 +1839,19 @@ window.PROCESS_LIBRARY = {
     return (w > 0 && l > 0) ? w / l : NaN;
   }
   function fmtRatio(x) { return isFinite(x) ? (x >= 100 ? x.toFixed(0) : x.toFixed(2)) : "?"; }
+
+  // Derived driver on-resistance from an I-V table: the near-rail slope
+  // dV/dI in the low-voltage (triode) region. This is the "resistance"
+  // an SI engineer reads off the pull-up/pull-down curve.
+  function ronOf(tbl, vcc) {
+    if (!tbl || tbl.length < 2 || !(vcc > 0)) return NaN;
+    const pts = tbl.filter(function (p) { return p.v > 1e-9 && p.v <= 0.5 * vcc && p.typ > 0; })
+                   .sort(function (a, b) { return a.v - b.v; });
+    if (pts.length < 1) return NaN;
+    const a = pts[0], b = pts[pts.length - 1];
+    const dI = b.typ - a.typ;
+    return dI > 1e-12 ? (b.v - a.v) / dI : a.v / a.typ;
+  }
 
   // ---- Standard pad-ring cap (bond pad + ESD) per process ----
   function cpadOf(sel) { const e = sel && window.PROCESS_LIBRARY[sel.value]; return e ? e.cpad : 0.5e-12; }
@@ -2304,6 +2332,7 @@ window.PROCESS_LIBRARY = {
       tr: mo.ramp ? mo.ramp.dtr.typ : NaN, tf: mo.ramp ? mo.ramp.dtf.typ : NaN,
       clamps: !!(mo.gndClamp && mo.gndClamp.length),
       pkg: { r: m.pkg.r, l: m.pkg.l, c: m.pkg.c },
+      ronPu: ronOf(mo.pullup, mo.vcc), ronPd: ronOf(mo.pulldown, mo.vcc),
       puLabel: L.pu, pdLabel: L.pd,
       ivPullup: mo.pullup, ivPulldown: mo.pulldown,
       note: L.note
@@ -2319,6 +2348,9 @@ window.PROCESS_LIBRARY = {
     try {
       const d = baseModel();
       dispatchBuild(d);
+
+      d.model.ronPd = ronOf(d.model.pulldown, d.model.vcc);
+      d.model.ronPu = ronOf(d.model.pullup, d.model.vcc);
 
       const v = window.Validate.run(d);
       renderValidation(v);

@@ -57,6 +57,12 @@
     return (x >= 0 ? " " : "") + x.toFixed(4);
   }
 
+  function ohms(x) {
+    if (x == null || !isFinite(x)) return "n/a";
+    if (x >= 1000) return (x / 1000).toFixed(2) + " kohm";
+    return x.toFixed(1) + " ohm";
+  }
+
   function pad(s, n) {
     s = String(s);
     return s.length >= n ? s : s + " ".repeat(n - s.length);
@@ -127,6 +133,13 @@
       s += "|\n";
       s += "[Voltage Range]  " + m.vcc + "\t" + m.vccMin + "\t" + m.vccMax + "\n";
       s += "[Temperature Range] " + m.tempTyp + "\t" + m.tempMin + "\t" + m.tempMax + "\n";
+      if (isFinite(m.ronPd) || isFinite(m.ronPu)) {
+        s += "|\n";
+        s += "| Derived driver output impedance (near-rail slope dV/dI of the I-V tables):\n";
+        s += "|   Pulldown R_on ~ " + ohms(m.ronPd) + "     Pullup R_on ~ " + ohms(m.ronPu) + "\n";
+        s += "| NOTE: informational only -- IBIS carries no driver resistance; the drive\n";
+        s += "|       is the [Pulldown]/[Pullup] I-V tables below. R = V/I along the curve.\n";
+      }
       s += "\n";
 
       if (m.pulldown && m.pulldown.length)   s += ivTable("Pulldown", m.pulldown) + "\n";

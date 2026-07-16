@@ -24,6 +24,16 @@ schematic and a mini I‑V plot that update in real time: PMOS pull-up, NMOS pul
 PAD node, `C_comp`, POWER/GND clamp diodes, and package `R/L/C`, each labelled with
 its current value.
 
+### Derived driver on-resistance
+
+IBIS has **no explicit driver resistance** — the pull-up/pull-down sections are `I(V)`
+tables (a nonlinear voltage-controlled current, i.e. a nonlinear resistor). The tool
+derives the **driver output impedance** `R_on = dV/dI` from the near-rail slope of those
+tables and shows it on the schematic for both devices, and as **informational comment
+lines in the generated `.ibs`** (clearly marked — it is not a real IBIS keyword). This
+is the number SI engineers read off the I‑V curve for impedance matching; `τ ≈ R_on·C_total`
+ties it to the step response.
+
 ### Transient step response
 
 A live **step-response simulation** drives the output node (C_comp + an external load
