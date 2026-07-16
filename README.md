@@ -1,0 +1,77 @@
+# IBIS Model Builder
+
+A tiny, dependency-free, **100% client-side** web tool that generates a board-level
+[IBIS](https://ibis.org/) (`.ibs`) model for a CMOS I/O buffer — right in your browser.
+
+There is no modern web front-end for building IBIS models; the classic free tool
+(`s2ibis3`) is 2005-era C. This fills that gap with a clean HTML UI and three ways in:
+
+| Input path | What you give it | Trust level |
+|---|---|---|
+| **Device W/L + process** | NMOS/PMOS W/L ratios + a process node (incl. **SkyWater sky130**) | ⭐ Ballpark — square-law physics |
+| **Rise / Fall @ load** | Measured/simulated edge rates at a known load cap | ⭐⭐⭐ Real behavioral data |
+| **Paste I‑V / V‑t** | Raw pullup/pulldown I‑V points + edge rates | ⭐⭐⭐⭐ Whatever you feed it |
+
+All three feed **one** IBIS assembler core, so the output format is identical
+regardless of input.
+
+## ⚠️ Accuracy disclaimer
+
+This tool produces a **first-order estimate**, not silicon-validated data.
+
+- The **W/L path** uses the long-channel (Shichman–Hodges) square-law MOSFET model.
+  It ignores velocity saturation, mobility degradation, and short-channel effects, so
+  it will **overstate drive strength at modern nodes**. Treat it as intuition-building.
+- The **Rise/Fall** and **Paste** paths are only as good as the data you provide, but
+  because they start from real behavioral measurements they are far more trustworthy.
+- **Always** run the output through the golden parser
+  [`ibischk`](https://ibis.org/tools/) and correlate against SPICE or measurement
+  before using a model for real board sign-off.
+
+## Usage
+
+Just open `index.html` in a browser — no build step, no server, no install.
+
+Or host it as a static site (e.g. GitHub Pages) and use it online.
+
+1. Fill in the component/model basics and your pin list.
+2. Pick an input tab and enter your data.
+3. Click **Generate** → review the built-in sanity checks → **Download `.ibs`**.
+
+## Process library
+
+Parameters live in [`js/process-library.js`](js/process-library.js). The **sky130**
+entry is anchored to the SkyWater open PDK (1.8 V devices, `toxe = 11.6 nm` →
+`Cox ≈ 3.0 fF/µm²`); the other nodes are generic textbook typicals. Add your own node
+by dropping a new entry in that file, or use the **Custom** option and type parameters
+directly in the UI.
+
+## Project layout
+
+```
+index.html              UI
+css/style.css           styling (light + dark)
+js/process-library.js   per-node square-law parameters (incl. sky130)
+js/ibis-core.js         the assembler: normalized data -> .ibs text
+js/square-law.js        adapter: W/L + process -> model data
+js/risefall.js          adapter: rise/fall @ Cload -> model data
+js/validate.js          lightweight sanity checks (not ibischk)
+js/app.js               DOM wiring
+```
+
+Each input adapter produces the same normalized model-data object; `ibis-core.js`
+turns that into IBIS v3.2 text. To add a new input method, write an adapter that emits
+the normalized shape (documented at the top of `ibis-core.js`) — the assembler and
+validator come for free.
+
+## Roadmap
+
+- [ ] `ngspice`-WASM adapter: run a real buffer sim in-browser from a user-uploaded
+      model card (accurate W/L path).
+- [ ] Port/compile `ibischk` to WASM for true golden validation.
+- [ ] IBIS-AMI export for high-speed SerDes.
+- [ ] Per-corner (typ/min/max) independent parameter entry instead of ±% proxies.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Not affiliated with the IBIS Open Forum.

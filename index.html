@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IBIS Model Builder</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header>
+  <h1>IBIS Model Builder</h1>
+  <p class="tag">Generate a board-level <code>.ibs</code> model in your browser — from device geometry, from measured edge rates, or from raw I&#8209;V/V&#8209;t data. 100% client-side.</p>
+</header>
+
+<div class="disclaimer">
+  <strong>Estimate, not sign-off.</strong> The W/L path uses long-channel square-law physics and will overstate drive at modern nodes. Trust the <em>Rise/Fall</em> and <em>Paste Data</em> paths more than the geometry path. Always correlate against SPICE or silicon before real use.
+</div>
+
+<main>
+  <!-- ============ Shared settings ============ -->
+  <section class="card">
+    <h2>1 &middot; Component &amp; model</h2>
+    <div class="grid">
+      <label>Component name<input id="component" value="MyChip"></label>
+      <label>Manufacturer<input id="manufacturer" value="Unknown"></label>
+      <label>Model name<input id="modelName" value="buf_io"></label>
+      <label>Model type
+        <select id="modelType">
+          <option>I/O</option><option>Output</option><option>3-state</option>
+          <option>Open_drain</option><option>Input</option>
+        </select>
+      </label>
+      <label>Vinl (V)<input id="vinl" type="number" step="0.01" value="0.8"></label>
+      <label>Vinh (V)<input id="vinh" type="number" step="0.01" value="2.0"></label>
+    </div>
+    <details>
+      <summary>Package &amp; pin parasitics, temperature</summary>
+      <div class="grid">
+        <label>R_pkg (&#8486;)<input id="rpkg" type="number" step="0.01" value="0.1"></label>
+        <label>L_pkg (H)<input id="lpkg" type="number" step="1e-10" value="5e-9"></label>
+        <label>C_pkg (F)<input id="cpkg" type="number" step="1e-13" value="0.5e-12"></label>
+        <label>R_pin (&#8486;)<input id="rpin" type="number" step="0.01" value="0.1"></label>
+        <label>L_pin (H)<input id="lpin" type="number" step="1e-10" value="3e-9"></label>
+        <label>C_pin (F)<input id="cpin" type="number" step="1e-13" value="0.3e-12"></label>
+        <label>Temp typ (&deg;C)<input id="ttyp" type="number" value="25"></label>
+        <label>Temp min (&deg;C)<input id="tmin" type="number" value="0"></label>
+        <label>Temp max (&deg;C)<input id="tmax" type="number" value="85"></label>
+      </div>
+    </details>
+    <label class="full">Pins — one <code>number name</code> per line (all share the model above)
+      <textarea id="pins" rows="3">1 DQ0
+2 DQ1
+3 DQ2</textarea>
+    </label>
+  </section>
+
+  <!-- ============ Input method tabs ============ -->
+  <section class="card">
+    <h2>2 &middot; Where does the data come from?</h2>
+    <div class="tabs">
+      <button class="tab active" data-tab="wl">Device W/L + Process</button>
+      <button class="tab" data-tab="rf">Rise / Fall @ load</button>
+      <button class="tab" data-tab="paste">Paste I&#8209;V / V&#8209;t</button>
+    </div>
+
+    <!-- W/L -->
+    <div class="panel active" id="panel-wl">
+      <div class="grid">
+        <label>Process node
+          <select id="node"></select>
+        </label>
+        <label>NMOS W/L<input id="wlN" type="number" step="0.1" value="20"></label>
+        <label>PMOS W/L<input id="wlP" type="number" step="0.1" value="40"></label>
+        <label>C_comp override (pF, blank = estimate)<input id="wlCcomp" type="number" step="0.1" placeholder="auto"></label>
+      </div>
+      <p class="note" id="nodeNote"></p>
+      <details>
+        <summary>Edit process parameters (square-law)</summary>
+        <div class="grid">
+          <label>Vdd (V)<input id="p_vdd" type="number" step="0.01"></label>
+          <label>Vth,n (V)<input id="p_vthn" type="number" step="0.01"></label>
+          <label>Vth,p (V)<input id="p_vthp" type="number" step="0.01"></label>
+          <label>k'n (&micro;A/V&sup2;)<input id="p_kpn" type="number" step="1"></label>
+          <label>k'p (&micro;A/V&sup2;)<input id="p_kpp" type="number" step="1"></label>
+          <label>&lambda;n (1/V)<input id="p_ln" type="number" step="0.01"></label>
+          <label>&lambda;p (1/V)<input id="p_lp" type="number" step="0.01"></label>
+          <label>Cox (fF/&micro;m&sup2;)<input id="p_cox" type="number" step="0.1"></label>
+        </div>
+      </details>
+    </div>
+
+    <!-- Rise/Fall -->
+    <div class="panel" id="panel-rf">
+      <div class="grid">
+        <label>Supply / swing Vcc (V)<input id="rf_vcc" type="number" step="0.01" value="1.8"></label>
+        <label>Load cap C_load (pF)<input id="rf_cload" type="number" step="0.1" value="5"></label>
+        <label>Rise time (ns)<input id="rf_tr" type="number" step="0.01" value="1.2"></label>
+        <label>Fall time (ns)<input id="rf_tf" type="number" step="0.01" value="1.0"></label>
+        <label>Edge definition
+          <select id="rf_edge"><option value="20-80">20% – 80%</option><option value="10-90">10% – 90%</option></select>
+        </label>
+        <label>Pin C_comp (pF)<input id="rf_ccomp" type="number" step="0.1" value="2"></label>
+      </div>
+    </div>
+
+    <!-- Paste -->
+    <div class="panel" id="panel-paste">
+      <div class="grid">
+        <label>Vcc (V)<input id="ps_vcc" type="number" step="0.01" value="1.8"></label>
+        <label>Pin C_comp (pF)<input id="ps_ccomp" type="number" step="0.1" value="2"></label>
+        <label>Rise time (ns)<input id="ps_tr" type="number" step="0.01" value="1.2"></label>
+        <label>Fall time (ns)<input id="ps_tf" type="number" step="0.01" value="1.0"></label>
+      </div>
+      <label class="full">Pulldown I&#8209;V — one <code>Vout,current[A]</code> per line
+        <textarea id="ps_pd" rows="4" placeholder="0,0&#10;0.9,0.004&#10;1.8,0.006"></textarea></label>
+      <label class="full">Pullup I&#8209;V — one <code>Vtable(=Vcc-Vout),current[A]</code> per line
+        <textarea id="ps_pu" rows="4" placeholder="0,0&#10;0.9,0.004&#10;1.8,0.006"></textarea></label>
+    </div>
+
+    <button id="generate" class="primary">Generate IBIS model &rarr;</button>
+  </section>
+
+  <!-- ============ Output ============ -->
+  <section class="card" id="outCard" hidden>
+    <h2>3 &middot; Output</h2>
+    <div id="validation"></div>
+    <div class="outbar">
+      <button id="download">&#8595; Download .ibs</button>
+      <button id="copy">Copy</button>
+    </div>
+    <pre id="output"></pre>
+  </section>
+</main>
+
+<footer>
+  <p>Open source · MIT · <a href="https://github.com/borenw/ibis-model-builder">github.com/borenw/ibis-model-builder</a>. Not affiliated with the IBIS Open Forum. Validate output with <code>ibischk</code> before use.</p>
+</footer>
+
+<script src="js/process-library.js"></script>
+<script src="js/ibis-core.js"></script>
+<script src="js/square-law.js"></script>
+<script src="js/risefall.js"></script>
+<script src="js/validate.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
