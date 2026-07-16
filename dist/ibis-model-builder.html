@@ -286,8 +286,10 @@ footer a { color: var(--accent); }
         <label>Process node
           <select id="node"></select>
         </label>
-        <label>NMOS W/L<input id="wlN" type="number" step="0.1" value="20"></label>
-        <label>PMOS W/L<input id="wlP" type="number" step="0.1" value="40"></label>
+        <label>NMOS width W (µm)<input id="wN" type="number" step="0.01" value="3"></label>
+        <label>NMOS length L (µm)<input id="lN" type="number" step="0.01" value="0.15"></label>
+        <label>PMOS width W (µm)<input id="wP" type="number" step="0.01" value="6"></label>
+        <label>PMOS length L (µm)<input id="lP" type="number" step="0.01" value="0.15"></label>
         <label>C_comp override (pF, blank = estimate)<input id="wlCcomp" type="number" step="0.1" placeholder="auto"></label>
       </div>
       <p class="note" id="nodeNote"></p>
@@ -349,8 +351,10 @@ footer a { color: var(--accent); }
           <label>GND net<select id="net_gnd"></select></label>
           <label>Input net<select id="net_in"></select></label>
           <label>Process node<select id="net_node"></select></label>
-          <label>Pulldown NMOS W/L<input id="net_wlN" type="number" step="0.1"></label>
-          <label>Pullup PMOS W/L<input id="net_wlP" type="number" step="0.1"></label>
+          <label>Pulldown NMOS W (µm)<input id="net_wN" type="number" step="0.01"></label>
+          <label>Pulldown NMOS L (µm)<input id="net_lN" type="number" step="0.01"></label>
+          <label>Pullup PMOS W (µm)<input id="net_wP" type="number" step="0.01"></label>
+          <label>Pullup PMOS L (µm)<input id="net_lP" type="number" step="0.01"></label>
           <label>C_comp override (pF, blank = estimate)<input id="net_ccomp" type="number" step="0.1" placeholder="auto"></label>
         </div>
         <p class="note" id="net_devinfo"></p>
@@ -376,8 +380,10 @@ footer a { color: var(--accent); }
       </div>
       <div class="grid" style="margin-top:0.8rem">
         <label>Process node<select id="cad_node"></select></label>
-        <label>Pulldown NMOS W/L<input id="cad_wlN" type="number" step="0.1" placeholder="from script"></label>
-        <label>Pullup PMOS W/L<input id="cad_wlP" type="number" step="0.1" placeholder="from script"></label>
+        <label>Pulldown NMOS W (µm)<input id="cad_wN" type="number" step="0.01" placeholder="from script"></label>
+        <label>Pulldown NMOS L (µm)<input id="cad_lN" type="number" step="0.01" placeholder="from script"></label>
+        <label>Pullup PMOS W (µm)<input id="cad_wP" type="number" step="0.01" placeholder="from script"></label>
+        <label>Pullup PMOS L (µm)<input id="cad_lP" type="number" step="0.01" placeholder="from script"></label>
         <label>C_comp override (pF, blank = estimate)<input id="cad_ccomp" type="number" step="0.1" placeholder="auto"></label>
       </div>
     </div>
@@ -420,14 +426,23 @@ footer a { color: var(--accent); }
 /*
  * process-library.js
  * ------------------------------------------------------------------
- * First-order (square-law) device parameters per process node.
+ * First-order (square-law) device parameters per process node & device
+ * flavor.
  *
- * These are TYPICAL / APPROXIMATE values meant for a ballpark
- * behavioral estimate only -- NOT sign-off accurate. The only entry
- * anchored to a real open PDK is `sky130`.
+ * IMPORTANT: except for `sky130` (anchored to the SkyWater open PDK),
+ * every entry is a GENERIC / APPROXIMATE typical for a process of that
+ * class -- NOT confidential foundry PDK data. TSMC exact model cards are
+ * under NDA; the "TSMC ..." entries are ballpark estimates for a node of
+ * that generation, useful for intuition and first-pass board checks only.
+ *
+ * Device flavors within a node matter for IBIS: an I/O buffer almost
+ * always uses the MV/HV *I/O* device (thick oxide, higher Vdd/Vth), not
+ * the LV core device -- so pick the flavor your pad driver actually uses.
  *
  * Fields:
- *   vdd     : nominal core supply (V)
+ *   group   : optgroup heading in the UI dropdown
+ *   label   : option text
+ *   vdd     : nominal supply (V)
  *   vthn    : NMOS threshold (V, positive)
  *   vthp    : PMOS threshold magnitude (V, positive)
  *   kpn     : NMOS transconductance param k'n = un*Cox (uA/V^2)
@@ -439,68 +454,166 @@ footer a { color: var(--accent); }
  * ------------------------------------------------------------------
  */
 window.PROCESS_LIBRARY = {
+  /* ---------- Open PDK (silicon-anchored) ---------- */
   sky130: {
-    label: "SkyWater sky130 (130 nm, 1.8 V)",
-    vdd: 1.8, vthn: 0.45, vthp: 0.45,
-    kpn: 120, kpp: 40,
-    lambdan: 0.05, lambdap: 0.06,
-    cox: 2.98,
+    group: "Open PDK (silicon-anchored)",
+    label: "SkyWater sky130 — 1.8 V I/O (130 nm)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.45, kpn: 120, kpp: 40,
+    lambdan: 0.05, lambdap: 0.06, cox: 2.98,
     note: "Anchored to the SkyWater open PDK 1.8 V devices: toxe = 11.6 nm -> Cox ~ 3.0 fF/um^2. Vth/mobility are approximate typicals for square-law use."
   },
+
+  /* ---------- TSMC-class (ESTIMATED, not PDK data) ---------- */
+  tsmc180_lv: {
+    group: "TSMC 180 nm (estimated)",
+    label: "Core 1.8 V (LV)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.47, kpn: 170, kpp: 42,
+    lambdan: 0.06, lambdap: 0.08, cox: 8.6,
+    note: "Estimated typical for a TSMC-class 0.18 um CORE device (tox ~ 4 nm). Not TSMC PDK data."
+  },
+  tsmc180_mv: {
+    group: "TSMC 180 nm (estimated)",
+    label: "I/O 3.3 V (MV)",
+    vdd: 3.3, vthn: 0.60, vthp: 0.65, kpn: 110, kpp: 28,
+    lambdan: 0.04, lambdap: 0.05, cox: 4.3,
+    note: "Estimated typical for a TSMC-class 0.18 um 3.3 V I/O device (tox ~ 8 nm). Not TSMC PDK data."
+  },
+  tsmc180_hv: {
+    group: "TSMC 180 nm (estimated)",
+    label: "I/O 5 V (HV)",
+    vdd: 5.0, vthn: 0.70, vthp: 0.75, kpn: 90, kpp: 22,
+    lambdan: 0.03, lambdap: 0.04, cox: 3.0,
+    note: "Estimated typical for a TSMC-class 0.18 um 5 V HV I/O device (tox ~ 12 nm). Not TSMC PDK data."
+  },
+
+  tsmc130_lv: {
+    group: "TSMC 130 nm (estimated)",
+    label: "Core 1.2 V (LV)",
+    vdd: 1.2, vthn: 0.35, vthp: 0.37, kpn: 350, kpp: 80,
+    lambdan: 0.08, lambdap: 0.10, cox: 12.8,
+    note: "Estimated typical for a TSMC-class 0.13 um CORE device (tox ~ 2.7 nm). Not TSMC PDK data."
+  },
+  tsmc130_mv: {
+    group: "TSMC 130 nm (estimated)",
+    label: "I/O 2.5 V (MV)",
+    vdd: 2.5, vthn: 0.50, vthp: 0.55, kpn: 150, kpp: 38,
+    lambdan: 0.05, lambdap: 0.06, cox: 6.0,
+    note: "Estimated typical for a TSMC-class 0.13 um 2.5 V I/O device (tox ~ 5.6 nm). Not TSMC PDK data."
+  },
+  tsmc130_hv: {
+    group: "TSMC 130 nm (estimated)",
+    label: "I/O 3.3 V (HV)",
+    vdd: 3.3, vthn: 0.60, vthp: 0.65, kpn: 120, kpp: 30,
+    lambdan: 0.04, lambdap: 0.05, cox: 4.3,
+    note: "Estimated typical for a TSMC-class 0.13 um 3.3 V I/O device (tox ~ 8 nm). Not TSMC PDK data."
+  },
+
+  tsmc65_lv: {
+    group: "TSMC 65 nm (estimated)",
+    label: "Core 1.0 V (LV)",
+    vdd: 1.0, vthn: 0.30, vthp: 0.32, kpn: 500, kpp: 110,
+    lambdan: 0.14, lambdap: 0.16, cox: 18.0,
+    note: "Estimated typical for a TSMC-class 65 nm CORE device (tox ~ 1.85 nm). Not TSMC PDK data."
+  },
+  tsmc65_mv: {
+    group: "TSMC 65 nm (estimated)",
+    label: "I/O 1.8 V (MV)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.47, kpn: 200, kpp: 48,
+    lambdan: 0.06, lambdap: 0.08, cox: 8.6,
+    note: "Estimated typical for a TSMC-class 65 nm 1.8 V I/O device (tox ~ 4 nm). Not TSMC PDK data."
+  },
+  tsmc65_hv: {
+    group: "TSMC 65 nm (estimated)",
+    label: "I/O 3.3 V (HV)",
+    vdd: 3.3, vthn: 0.60, vthp: 0.65, kpn: 120, kpp: 30,
+    lambdan: 0.04, lambdap: 0.05, cox: 4.3,
+    note: "Estimated typical for a TSMC-class 65 nm 3.3 V HV I/O device (tox ~ 8 nm). Not TSMC PDK data."
+  },
+
+  tsmc40_lv: {
+    group: "TSMC 40 nm (estimated)",
+    label: "Core 1.1 V (LV)",
+    vdd: 1.1, vthn: 0.30, vthp: 0.32, kpn: 560, kpp: 125,
+    lambdan: 0.16, lambdap: 0.18, cox: 22.0,
+    note: "Estimated typical for a TSMC-class 40 nm CORE device (tox ~ 1.75 nm). Not TSMC PDK data."
+  },
+  tsmc40_mv: {
+    group: "TSMC 40 nm (estimated)",
+    label: "I/O 1.8 V (MV)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.47, kpn: 210, kpp: 50,
+    lambdan: 0.06, lambdap: 0.08, cox: 8.6,
+    note: "Estimated typical for a TSMC-class 40 nm 1.8 V I/O device (tox ~ 4 nm). Not TSMC PDK data."
+  },
+  tsmc40_hv: {
+    group: "TSMC 40 nm (estimated)",
+    label: "I/O 2.5 V (HV)",
+    vdd: 2.5, vthn: 0.50, vthp: 0.55, kpn: 150, kpp: 38,
+    lambdan: 0.05, lambdap: 0.06, cox: 6.0,
+    note: "Estimated typical for a TSMC-class 40 nm 2.5 V HV I/O device (tox ~ 5.6 nm). Not TSMC PDK data."
+  },
+
+  tsmc28_lv: {
+    group: "TSMC 28 nm (estimated)",
+    label: "Core 0.9 V (LV, HKMG)",
+    vdd: 0.9, vthn: 0.25, vthp: 0.27, kpn: 620, kpp: 140,
+    lambdan: 0.20, lambdap: 0.22, cox: 30.0,
+    note: "Estimated typical for a TSMC-class 28 nm HKMG CORE device (EOT ~ 1.1 nm). Not TSMC PDK data."
+  },
+  tsmc28_mv: {
+    group: "TSMC 28 nm (estimated)",
+    label: "I/O 1.8 V (MV)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.47, kpn: 210, kpp: 52,
+    lambdan: 0.06, lambdap: 0.08, cox: 8.6,
+    note: "Estimated typical for a TSMC-class 28 nm 1.8 V I/O device (tox ~ 4 nm). Not TSMC PDK data."
+  },
+  tsmc28_hv: {
+    group: "TSMC 28 nm (estimated)",
+    label: "I/O 3.3 V (HV)",
+    vdd: 3.3, vthn: 0.60, vthp: 0.65, kpn: 120, kpp: 30,
+    lambdan: 0.04, lambdap: 0.05, cox: 4.3,
+    note: "Estimated typical for a TSMC-class 28 nm 3.3 V HV I/O device (tox ~ 8 nm). Not TSMC PDK data."
+  },
+
+  tsmc16_lv: {
+    group: "TSMC 16 nm FinFET (estimated)",
+    label: "Core 0.8 V (LV) — FinFET*",
+    vdd: 0.8, vthn: 0.20, vthp: 0.22, kpn: 800, kpp: 180,
+    lambdan: 0.25, lambdap: 0.28, cox: 35.0,
+    note: "*FinFET: square-law is a POOR fit (drive is per-fin/quantized, not W/L-continuous). Rough estimate only. Not TSMC PDK data."
+  },
+  tsmc16_io: {
+    group: "TSMC 16 nm FinFET (estimated)",
+    label: "I/O 1.8 V (planar I/O)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.47, kpn: 210, kpp: 52,
+    lambdan: 0.06, lambdap: 0.08, cox: 8.6,
+    note: "Estimated typical for the planar 1.8 V I/O device in a TSMC-class 16 nm FinFET flow. Not TSMC PDK data."
+  },
+
+  /* ---------- Generic textbook nodes ---------- */
   n180: {
-    label: "Generic 180 nm (1.8 V)",
-    vdd: 1.8, vthn: 0.45, vthp: 0.45,
-    kpn: 170, kpp: 40,
-    lambdan: 0.06, lambdap: 0.08,
-    cox: 8.6,
+    group: "Generic textbook", label: "Generic 180 nm (1.8 V)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.45, kpn: 170, kpp: 40,
+    lambdan: 0.06, lambdap: 0.08, cox: 8.6,
     note: "Generic textbook typicals for a 0.18 um process (tox ~ 4 nm). Not tied to any specific PDK."
   },
-  n130: {
-    label: "Generic 130 nm (1.2 V)",
-    vdd: 1.2, vthn: 0.35, vthp: 0.35,
-    kpn: 350, kpp: 80,
-    lambdan: 0.08, lambdap: 0.10,
-    cox: 12.8,
-    note: "Generic textbook typicals for a 0.13 um core device (tox ~ 2.7 nm)."
-  },
   n90: {
-    label: "Generic 90 nm (1.2 V)",
-    vdd: 1.2, vthn: 0.30, vthp: 0.30,
-    kpn: 430, kpp: 100,
-    lambdan: 0.10, lambdap: 0.12,
-    cox: 15.0,
+    group: "Generic textbook", label: "Generic 90 nm (1.2 V)",
+    vdd: 1.2, vthn: 0.30, vthp: 0.30, kpn: 430, kpp: 100,
+    lambdan: 0.10, lambdap: 0.12, cox: 15.0,
     note: "Generic textbook typicals for a 90 nm core device."
   },
-  n65: {
-    label: "Generic 65 nm (1.0 V)",
-    vdd: 1.0, vthn: 0.28, vthp: 0.28,
-    kpn: 500, kpp: 110,
-    lambdan: 0.14, lambdap: 0.16,
-    cox: 18.0,
-    note: "Generic textbook typicals for a 65 nm core device."
-  },
   n45: {
-    label: "Generic 45 nm (1.0 V)",
-    vdd: 1.0, vthn: 0.25, vthp: 0.25,
-    kpn: 560, kpp: 120,
-    lambdan: 0.18, lambdap: 0.20,
-    cox: 25.0,
+    group: "Generic textbook", label: "Generic 45 nm (1.0 V)",
+    vdd: 1.0, vthn: 0.25, vthp: 0.25, kpn: 560, kpp: 120,
+    lambdan: 0.18, lambdap: 0.20, cox: 25.0,
     note: "Generic textbook typicals for a 45 nm core device."
   },
-  n28: {
-    label: "Generic 28 nm (0.9 V)",
-    vdd: 0.9, vthn: 0.22, vthp: 0.22,
-    kpn: 620, kpp: 130,
-    lambdan: 0.22, lambdap: 0.24,
-    cox: 30.0,
-    note: "Generic textbook typicals for a 28 nm core device."
-  },
+
+  /* ---------- Custom ---------- */
   custom: {
-    label: "Custom (enter parameters)",
-    vdd: 1.8, vthn: 0.45, vthp: 0.45,
-    kpn: 120, kpp: 40,
-    lambdan: 0.05, lambdap: 0.06,
-    cox: 3.0,
+    group: "Custom", label: "Custom (enter parameters)",
+    vdd: 1.8, vthn: 0.45, vthp: 0.45, kpn: 120, kpp: 40,
+    lambdan: 0.05, lambdap: 0.06, cox: 3.0,
     note: "User-defined parameters."
   }
 };
@@ -1365,40 +1478,40 @@ window.PROCESS_LIBRARY = {
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.6";
+  const APP_REV = "v1.7";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
   let lastText = "";
 
   // ---- Populate process-node dropdown ----
-  const nodeSel = $("node");
-  Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
-    const o = document.createElement("option");
-    o.value = key;
-    o.textContent = window.PROCESS_LIBRARY[key].label;
-    nodeSel.appendChild(o);
-  });
-  nodeSel.value = "sky130";
-
-  // Mirror the node list into the netlist tab's own selector.
-  const netNodeSel = $("net_node");
-  Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
-    const o = document.createElement("option");
-    o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
-    netNodeSel.appendChild(o);
-  });
-  netNodeSel.value = "sky130";
-
-  const cadNodeSel = $("net_node") && $("cad_node");
-  if (cadNodeSel) {
+  // Populate a node <select> with <optgroup>s from PROCESS_LIBRARY.
+  function populateNodes(sel) {
+    if (!sel) return;
+    const groups = {}, order = [];
     Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
-      const o = document.createElement("option");
-      o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
-      cadNodeSel.appendChild(o);
+      const g = window.PROCESS_LIBRARY[key].group || "Other";
+      if (!groups[g]) { groups[g] = []; order.push(g); }
+      groups[g].push(key);
     });
-    cadNodeSel.value = "sky130";
+    order.forEach(function (g) {
+      const og = document.createElement("optgroup"); og.label = g;
+      groups[g].forEach(function (key) {
+        const o = document.createElement("option");
+        o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+    sel.value = "sky130";
   }
+
+  const nodeSel = $("node");
+  const netNodeSel = $("net_node");
+  const cadNodeSel = $("cad_node");
+  populateNodes(nodeSel);
+  populateNodes(netNodeSel);
+  populateNodes(cadNodeSel);
 
   function loadNodeParams() {
     const p = window.PROCESS_LIBRARY[nodeSel.value];
@@ -1474,19 +1587,28 @@ window.PROCESS_LIBRARY = {
   }
 
   // ---- Adapters -> fill model electrical data ----
+  // Read a W (µm) and L (µm) pair and return the W/L ratio (NaN if invalid).
+  function ratio(wId, lId) {
+    const w = parseFloat($(wId).value), l = parseFloat($(lId).value);
+    return (w > 0 && l > 0) ? w / l : NaN;
+  }
+  function fmtRatio(x) { return isFinite(x) ? (x >= 100 ? x.toFixed(0) : x.toFixed(2)) : "?"; }
+
   function buildFromWL(d) {
     const params = {
       vdd: num("p_vdd"), vthn: num("p_vthn"), vthp: num("p_vthp"),
       kpn: num("p_kpn"), kpp: num("p_kpp"),
       lambdan: num("p_ln"), lambdap: num("p_lp"), cox: num("p_cox")
     };
+    const wlN = ratio("wN", "lN"), wlP = ratio("wP", "lP");
+    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Enter positive W and L for both devices.");
     const ccompOv = $("wlCcomp").value ? num("wlCcomp") * 1e-12 : null;
-    const r = window.SquareLaw.generate({
-      params: params, wlN: num("wlN"), wlP: num("wlP"), ccomp: ccompOv
-    });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
     applyElectrical(d, params.vdd, r);
     d.provenance = "Square-law estimate. node=" + nodeSel.value +
-      ", W/L(n)=" + num("wlN") + ", W/L(p)=" + num("wlP") + ", Vcc=" + params.vdd + "V.";
+      ", NMOS " + $("wN").value + "/" + $("lN").value + "um (W/L=" + fmtRatio(wlN) + ")" +
+      ", PMOS " + $("wP").value + "/" + $("lP").value + "um (W/L=" + fmtRatio(wlP) + ")" +
+      ", Vcc=" + params.vdd + "V.";
   }
 
   function buildFromRF(d) {
@@ -1555,8 +1677,11 @@ window.PROCESS_LIBRARY = {
     fillSelect($("net_vdd"), r.nets, r.guess.vdd);
     fillSelect($("net_gnd"), r.nets, r.guess.gnd);
     fillSelect($("net_in"),  r.nets, r.guess.input);
-    $("net_wlN").value = isFinite(r.output.nWL) ? +r.output.nWL.toFixed(3) : "";
-    $("net_wlP").value = isFinite(r.output.pWL) ? +r.output.pWL.toFixed(3) : "";
+    const um = function (m) { return isFinite(m) ? +(m * 1e6).toFixed(4) : ""; };
+    $("net_wN").value = r.output.nDev ? um(r.output.nDev.w) : "";
+    $("net_lN").value = r.output.nDev ? um(r.output.nDev.l) : "";
+    $("net_wP").value = r.output.pDev ? um(r.output.pDev.w) : "";
+    $("net_lP").value = r.output.pDev ? um(r.output.pDev.l) : "";
     const info = [];
     if (r.output.nDev) info.push("Pulldown: " + r.output.nDev.name + " (W/L=" + fmtWL(r.output.nDev) + ")");
     if (r.output.pDev) info.push("Pullup: " + r.output.pDev.name + " (W/L=" + fmtWL(r.output.pDev) + ")");
@@ -1577,8 +1702,8 @@ window.PROCESS_LIBRARY = {
       vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
       kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
     };
-    const wlN = parseFloat($("net_wlN").value), wlP = parseFloat($("net_wlP").value);
-    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W/L manually.");
+    const wlN = ratio("net_wN", "net_lN"), wlP = ratio("net_wP", "net_lP");
+    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W and L manually.");
     const ccompOv = $("net_ccomp").value ? parseFloat($("net_ccomp").value) * 1e-12 : null;
     const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
     applyElectrical(d, params.vdd, r);
@@ -1688,9 +1813,9 @@ window.PROCESS_LIBRARY = {
       vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
       kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
     };
-    const wlN = parseFloat($("cad_wlN").value), wlP = parseFloat($("cad_wlP").value);
+    const wlN = ratio("cad_wN", "cad_lN"), wlP = ratio("cad_wP", "cad_lP");
     if (!(wlN > 0) || !(wlP > 0))
-      throw new Error("Enter the NMOS/PMOS W/L from the SKILL script output first.");
+      throw new Error("Enter the NMOS/PMOS W and L from the SKILL script output first.");
     const ccompOv = $("cad_ccomp").value ? parseFloat($("cad_ccomp").value) * 1e-12 : null;
     const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
     applyElectrical(d, params.vdd, r);
@@ -1779,13 +1904,13 @@ window.PROCESS_LIBRARY = {
   // ---- Live diagram (updates on every input change, before Generate) ----
   function labelsFor() {
     if (activeTab === "wl")
-      return { pu: "W/L = " + ($("wlP").value || "?"), pd: "W/L = " + ($("wlN").value || "?"),
+      return { pu: "W/L = " + fmtRatio(ratio("wP", "lP")), pd: "W/L = " + fmtRatio(ratio("wN", "lN")),
                note: "Square-law estimate from device geometry." };
     if (activeTab === "net")
-      return { pu: "W/L = " + ($("net_wlP").value || "?"), pd: "W/L = " + ($("net_wlN").value || "?"),
+      return { pu: "W/L = " + fmtRatio(ratio("net_wP", "net_lP")), pd: "W/L = " + fmtRatio(ratio("net_wN", "net_lN")),
                note: "Parsed from netlist; square-law on extracted W/L." };
     if (activeTab === "cad")
-      return { pu: "W/L = " + ($("cad_wlP").value || "?"), pd: "W/L = " + ($("cad_wlN").value || "?"),
+      return { pu: "W/L = " + fmtRatio(ratio("cad_wP", "cad_lP")), pd: "W/L = " + fmtRatio(ratio("cad_wN", "cad_lN")),
                note: "From Cadence cell; square-law on entered W/L." };
     if (activeTab === "rf")
       return { pu: "linear driver (from edges)", pd: "linear driver (from edges)",

@@ -10,40 +10,40 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.6";
+  const APP_REV = "v1.7";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
   let lastText = "";
 
   // ---- Populate process-node dropdown ----
-  const nodeSel = $("node");
-  Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
-    const o = document.createElement("option");
-    o.value = key;
-    o.textContent = window.PROCESS_LIBRARY[key].label;
-    nodeSel.appendChild(o);
-  });
-  nodeSel.value = "sky130";
-
-  // Mirror the node list into the netlist tab's own selector.
-  const netNodeSel = $("net_node");
-  Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
-    const o = document.createElement("option");
-    o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
-    netNodeSel.appendChild(o);
-  });
-  netNodeSel.value = "sky130";
-
-  const cadNodeSel = $("net_node") && $("cad_node");
-  if (cadNodeSel) {
+  // Populate a node <select> with <optgroup>s from PROCESS_LIBRARY.
+  function populateNodes(sel) {
+    if (!sel) return;
+    const groups = {}, order = [];
     Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
-      const o = document.createElement("option");
-      o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
-      cadNodeSel.appendChild(o);
+      const g = window.PROCESS_LIBRARY[key].group || "Other";
+      if (!groups[g]) { groups[g] = []; order.push(g); }
+      groups[g].push(key);
     });
-    cadNodeSel.value = "sky130";
+    order.forEach(function (g) {
+      const og = document.createElement("optgroup"); og.label = g;
+      groups[g].forEach(function (key) {
+        const o = document.createElement("option");
+        o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+    sel.value = "sky130";
   }
+
+  const nodeSel = $("node");
+  const netNodeSel = $("net_node");
+  const cadNodeSel = $("cad_node");
+  populateNodes(nodeSel);
+  populateNodes(netNodeSel);
+  populateNodes(cadNodeSel);
 
   function loadNodeParams() {
     const p = window.PROCESS_LIBRARY[nodeSel.value];
@@ -119,19 +119,28 @@
   }
 
   // ---- Adapters -> fill model electrical data ----
+  // Read a W (µm) and L (µm) pair and return the W/L ratio (NaN if invalid).
+  function ratio(wId, lId) {
+    const w = parseFloat($(wId).value), l = parseFloat($(lId).value);
+    return (w > 0 && l > 0) ? w / l : NaN;
+  }
+  function fmtRatio(x) { return isFinite(x) ? (x >= 100 ? x.toFixed(0) : x.toFixed(2)) : "?"; }
+
   function buildFromWL(d) {
     const params = {
       vdd: num("p_vdd"), vthn: num("p_vthn"), vthp: num("p_vthp"),
       kpn: num("p_kpn"), kpp: num("p_kpp"),
       lambdan: num("p_ln"), lambdap: num("p_lp"), cox: num("p_cox")
     };
+    const wlN = ratio("wN", "lN"), wlP = ratio("wP", "lP");
+    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Enter positive W and L for both devices.");
     const ccompOv = $("wlCcomp").value ? num("wlCcomp") * 1e-12 : null;
-    const r = window.SquareLaw.generate({
-      params: params, wlN: num("wlN"), wlP: num("wlP"), ccomp: ccompOv
-    });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
     applyElectrical(d, params.vdd, r);
     d.provenance = "Square-law estimate. node=" + nodeSel.value +
-      ", W/L(n)=" + num("wlN") + ", W/L(p)=" + num("wlP") + ", Vcc=" + params.vdd + "V.";
+      ", NMOS " + $("wN").value + "/" + $("lN").value + "um (W/L=" + fmtRatio(wlN) + ")" +
+      ", PMOS " + $("wP").value + "/" + $("lP").value + "um (W/L=" + fmtRatio(wlP) + ")" +
+      ", Vcc=" + params.vdd + "V.";
   }
 
   function buildFromRF(d) {
@@ -200,8 +209,11 @@
     fillSelect($("net_vdd"), r.nets, r.guess.vdd);
     fillSelect($("net_gnd"), r.nets, r.guess.gnd);
     fillSelect($("net_in"),  r.nets, r.guess.input);
-    $("net_wlN").value = isFinite(r.output.nWL) ? +r.output.nWL.toFixed(3) : "";
-    $("net_wlP").value = isFinite(r.output.pWL) ? +r.output.pWL.toFixed(3) : "";
+    const um = function (m) { return isFinite(m) ? +(m * 1e6).toFixed(4) : ""; };
+    $("net_wN").value = r.output.nDev ? um(r.output.nDev.w) : "";
+    $("net_lN").value = r.output.nDev ? um(r.output.nDev.l) : "";
+    $("net_wP").value = r.output.pDev ? um(r.output.pDev.w) : "";
+    $("net_lP").value = r.output.pDev ? um(r.output.pDev.l) : "";
     const info = [];
     if (r.output.nDev) info.push("Pulldown: " + r.output.nDev.name + " (W/L=" + fmtWL(r.output.nDev) + ")");
     if (r.output.pDev) info.push("Pullup: " + r.output.pDev.name + " (W/L=" + fmtWL(r.output.pDev) + ")");
@@ -222,8 +234,8 @@
       vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
       kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
     };
-    const wlN = parseFloat($("net_wlN").value), wlP = parseFloat($("net_wlP").value);
-    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W/L manually.");
+    const wlN = ratio("net_wN", "net_lN"), wlP = ratio("net_wP", "net_lP");
+    if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W and L manually.");
     const ccompOv = $("net_ccomp").value ? parseFloat($("net_ccomp").value) * 1e-12 : null;
     const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
     applyElectrical(d, params.vdd, r);
@@ -333,9 +345,9 @@
       vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
       kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
     };
-    const wlN = parseFloat($("cad_wlN").value), wlP = parseFloat($("cad_wlP").value);
+    const wlN = ratio("cad_wN", "cad_lN"), wlP = ratio("cad_wP", "cad_lP");
     if (!(wlN > 0) || !(wlP > 0))
-      throw new Error("Enter the NMOS/PMOS W/L from the SKILL script output first.");
+      throw new Error("Enter the NMOS/PMOS W and L from the SKILL script output first.");
     const ccompOv = $("cad_ccomp").value ? parseFloat($("cad_ccomp").value) * 1e-12 : null;
     const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
     applyElectrical(d, params.vdd, r);
@@ -424,13 +436,13 @@
   // ---- Live diagram (updates on every input change, before Generate) ----
   function labelsFor() {
     if (activeTab === "wl")
-      return { pu: "W/L = " + ($("wlP").value || "?"), pd: "W/L = " + ($("wlN").value || "?"),
+      return { pu: "W/L = " + fmtRatio(ratio("wP", "lP")), pd: "W/L = " + fmtRatio(ratio("wN", "lN")),
                note: "Square-law estimate from device geometry." };
     if (activeTab === "net")
-      return { pu: "W/L = " + ($("net_wlP").value || "?"), pd: "W/L = " + ($("net_wlN").value || "?"),
+      return { pu: "W/L = " + fmtRatio(ratio("net_wP", "net_lP")), pd: "W/L = " + fmtRatio(ratio("net_wN", "net_lN")),
                note: "Parsed from netlist; square-law on extracted W/L." };
     if (activeTab === "cad")
-      return { pu: "W/L = " + ($("cad_wlP").value || "?"), pd: "W/L = " + ($("cad_wlN").value || "?"),
+      return { pu: "W/L = " + fmtRatio(ratio("cad_wP", "cad_lP")), pd: "W/L = " + fmtRatio(ratio("cad_wN", "cad_lN")),
                note: "From Cadence cell; square-law on entered W/L." };
     if (activeTab === "rf")
       return { pu: "linear driver (from edges)", pd: "linear driver (from edges)",

@@ -95,11 +95,22 @@ python3 build.py     # -> dist/ibis-model-builder.html
 
 ## Process library
 
-Parameters live in [`js/process-library.js`](js/process-library.js). The **sky130**
-entry is anchored to the SkyWater open PDK (1.8 V devices, `toxe = 11.6 nm` →
-`Cox ≈ 3.0 fF/µm²`); the other nodes are generic textbook typicals. Add your own node
-by dropping a new entry in that file, or use the **Custom** option and type parameters
-directly in the UI.
+Parameters live in [`js/process-library.js`](js/process-library.js), grouped in the
+dropdown by family:
+
+- **sky130** — anchored to the SkyWater open PDK (1.8 V devices, `toxe = 11.6 nm` →
+  `Cox ≈ 3.0 fF/µm²`).
+- **TSMC-class nodes (estimated)** — 180 / 130 / 65 / 40 / 28 nm and 16 nm FinFET,
+  each with its device **flavors**: **LV core**, **MV I/O**, and **HV I/O**. An I/O
+  buffer almost always uses the MV/HV I/O device (thick oxide, higher Vdd/Vth), *not*
+  the LV core — so pick the flavor your pad driver actually uses. ⚠️ These are generic
+  ballpark typicals for a node of that generation, **not confidential TSMC PDK data**
+  (those are under NDA). The 16 nm FinFET entries carry an extra caveat: square-law is
+  a poor fit for FinFETs (drive is per-fin/quantized, not W/L-continuous).
+- **Generic textbook** nodes and a **Custom** option (type parameters directly).
+
+Enter device geometry as **separate width (W) and length (L)** boxes in µm — the tool
+computes W/L for you. Add your own node by dropping a new entry in the file.
 
 ## Project layout
 
