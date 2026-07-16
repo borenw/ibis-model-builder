@@ -12,9 +12,26 @@ There is no modern web front-end for building IBIS models; the classic free tool
 | **Rise / Fall @ load** | Measured/simulated edge rates at a known load cap | ⭐⭐⭐ Real behavioral data |
 | **Paste I‑V / V‑t** | Raw pullup/pulldown I‑V points + edge rates | ⭐⭐⭐⭐ Whatever you feed it |
 | **Paste SPICE netlist** | A netlist of your buffer — it **auto-detects the PAD** net and pulls the output-stage W/L for you | ⭐ Ballpark — square-law on the extracted geometry |
+| **Cadence schematic** | Lib/cell/view + pin → generates a Virtuoso **SKILL/OCEAN** script to extract the pin's driver W/L | ⭐ Ballpark — square-law on the extracted geometry |
 
-All four feed **one** IBIS assembler core, so the output format is identical
+All five feed **one** IBIS assembler core, so the output format is identical
 regardless of input.
+
+### Live model preview
+
+As you type — **before** you click Generate — the tool draws the buffer model as a
+schematic and a mini I‑V plot that update in real time: PMOS pull-up, NMOS pull-down,
+PAD node, `C_comp`, POWER/GND clamp diodes, and package `R/L/C`, each labelled with
+its current value.
+
+### Cadence schematic path
+
+A browser can't read a Virtuoso OA database or a filesystem path directly, so the
+Cadence tab takes your library / cell / view + pin name and generates a
+**SKILL/OCEAN script** you paste into the Virtuoso CIW. It netlists the cell (which
+you can then drop into the *Paste SPICE netlist* tab) and prints the W/L of every FET
+whose drain touches the PAD net — the push-pull output devices. Paste those numbers
+back to build the model.
 
 ### PAD auto-detection
 
@@ -82,8 +99,9 @@ js/ibis-core.js         the assembler: normalized data -> .ibs text
 js/square-law.js        adapter: W/L + process -> model data
 js/risefall.js          adapter: rise/fall @ Cload -> model data
 js/netlist.js           adapter: SPICE netlist -> PAD/W/L -> model data
+js/diagram.js           live schematic + I-V preview (redraws as you type)
 js/validate.js          lightweight sanity checks (not ibischk)
-js/app.js               DOM wiring
+js/app.js               DOM wiring (incl. Cadence SKILL/OCEAN generator)
 build.py                inlines everything -> dist/ibis-model-builder.html
 dist/                   the single-file, double-click-to-run bundle
 ```

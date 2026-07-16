@@ -31,6 +31,16 @@
   });
   netNodeSel.value = "sky130";
 
+  const cadNodeSel = $("net_node") && $("cad_node");
+  if (cadNodeSel) {
+    Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
+      const o = document.createElement("option");
+      o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
+      cadNodeSel.appendChild(o);
+    });
+    cadNodeSel.value = "sky130";
+  }
+
   function loadNodeParams() {
     const p = window.PROCESS_LIBRARY[nodeSel.value];
     $("nodeNote").textContent = p.note;
@@ -54,6 +64,7 @@
       document.querySelectorAll(".panel").forEach(function (p) { p.classList.remove("active"); });
       btn.classList.add("active");
       $("panel-" + activeTab).classList.add("active");
+      updateDiagram();
     });
   });
 
@@ -183,6 +194,7 @@
     if (r.output.pDev) info.push("Pullup: " + r.output.pDev.name + " (W/L=" + fmtWL(r.output.pDev) + ")");
     $("net_devinfo").textContent = info.join("  ·  ");
     $("netResult").hidden = false;
+    updateDiagram();
   });
 
   function fmtWL(dv) {
@@ -205,6 +217,83 @@
     d.provenance = "Parsed from SPICE netlist. PAD=" + $("net_pad").value +
       ", VDD=" + $("net_vdd").value + ", GND=" + $("net_gnd").value +
       "; square-law on node=" + netNodeSel.value + ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
+  }
+
+  // ---- Cadence tab: generate a SKILL/OCEAN extraction script ----
+  function skillScript(lib, cell, view, pin) {
+    return [
+      ";; ===================================================================",
+      ";; IBIS Model Builder -- extract PAD driver W/L from a Virtuoso cell",
+      ";; Paste into the Virtuoso CIW and press Enter. Run from a shell with",
+      ";; the PDK loaded so the netlister and CDF params are available.",
+      ";; ===================================================================",
+      'lib  = "' + lib + '"',
+      'cell = "' + cell + '"',
+      'view = "' + view + '"',
+      'pin  = "' + pin + '"    ; the PAD / I-O net name',
+      "",
+      ";; 1) Netlist the cell to SPICE so you can paste it into the",
+      ";;    'Paste SPICE netlist' tab (which auto-detects the PAD):",
+      "simulator( 'spectre )",
+      "design( lib cell view )",
+      'resultsDir( strcat( "/tmp/" cell "_ibis" ) )',
+      "createNetlist( ?recreateAll t ?display nil )",
+      'printf("\\nSPICE netlist written under /tmp/%s_ibis -- open input.scs / netlist and paste it into the web tool.\\n" cell)',
+      "",
+      ";; 2) Print the W/L of every FET whose drain touches the PAD net",
+      ";;    (the push-pull output devices). Param names vary by PDK --",
+      ";;    adjust w/l below if your models use fw/nf/etc.",
+      'cv = dbOpenCellViewByType( lib cell view "" "r" )',
+      "theNet = car( setof( n cv~>nets  n~>name == pin ) )",
+      "when( theNet",
+      "  foreach( iterm theNet~>instTerms",
+      "    inst  = iterm~>inst",
+      "    mname = inst~>master~>cellName",
+      '    when( rexMatchp( "fet\\\\|mos\\\\|nch\\\\|pch" lower(mname) )',
+      '      w = dbReadCDFParam( inst "w" ) || inst~>w',
+      '      l = dbReadCDFParam( inst "l" ) || inst~>l',
+      '      printf("PAD driver: %-22s model=%-28s W=%L  L=%L\\n" inst~>name mname w l)',
+      "    )",
+      "  )",
+      ")",
+      'printf("Copy the W and L above into the W/L fields, or paste the netlist into the netlist tab.\\n")'
+    ].join("\n");
+  }
+
+  if ($("genSkill")) {
+    $("genSkill").addEventListener("click", function () {
+      const s = skillScript(
+        $("cad_lib").value.trim() || "my_lib",
+        $("cad_cell").value.trim() || "io_buffer",
+        $("cad_view").value.trim() || "schematic",
+        $("cad_pin").value.trim() || "PAD"
+      );
+      $("cad_skill").textContent = s;
+      $("cad_skillwrap").hidden = false;
+    });
+    $("copySkill").addEventListener("click", function () {
+      navigator.clipboard.writeText($("cad_skill").textContent).then(function () {
+        const b = $("copySkill"); const o = b.textContent; b.textContent = "Copied!";
+        setTimeout(function () { b.textContent = o; }, 1200);
+      });
+    });
+  }
+
+  function buildFromCadence(d) {
+    const base = window.PROCESS_LIBRARY[$("cad_node").value];
+    const params = {
+      vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
+      kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
+    };
+    const wlN = parseFloat($("cad_wlN").value), wlP = parseFloat($("cad_wlP").value);
+    if (!(wlN > 0) || !(wlP > 0))
+      throw new Error("Enter the NMOS/PMOS W/L from the SKILL script output first.");
+    const ccompOv = $("cad_ccomp").value ? parseFloat($("cad_ccomp").value) * 1e-12 : null;
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    applyElectrical(d, params.vdd, r);
+    d.provenance = "From Cadence cell " + $("cad_lib").value + "/" + $("cad_cell").value +
+      " pin " + $("cad_pin").value + "; square-law on node=" + $("cad_node").value +
+      ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
   }
 
   function applyElectrical(d, vcc, r) {
@@ -237,14 +326,64 @@
     block("ok", v.ok, "✔");
   }
 
+  function dispatchBuild(d) {
+    if (activeTab === "wl") buildFromWL(d);
+    else if (activeTab === "rf") buildFromRF(d);
+    else if (activeTab === "net") buildFromNet(d);
+    else if (activeTab === "cad") buildFromCadence(d);
+    else buildFromPaste(d);
+  }
+
+  // ---- Live diagram (updates on every input change, before Generate) ----
+  function labelsFor() {
+    if (activeTab === "wl")
+      return { pu: "W/L = " + ($("wlP").value || "?"), pd: "W/L = " + ($("wlN").value || "?"),
+               note: "Square-law estimate from device geometry." };
+    if (activeTab === "net")
+      return { pu: "W/L = " + ($("net_wlP").value || "?"), pd: "W/L = " + ($("net_wlN").value || "?"),
+               note: "Parsed from netlist; square-law on extracted W/L." };
+    if (activeTab === "cad")
+      return { pu: "W/L = " + ($("cad_wlP").value || "?"), pd: "W/L = " + ($("cad_wlN").value || "?"),
+               note: "From Cadence cell; square-law on entered W/L." };
+    if (activeTab === "rf")
+      return { pu: "linear driver (from edges)", pd: "linear driver (from edges)",
+               note: "Reconstructed from measured rise/fall times." };
+    return { pu: "from I-V data", pd: "from I-V data", note: "Assembled from pasted I-V / edge data." };
+  }
+
+  function updateDiagram() {
+    let m = null;
+    try {
+      const tmp = baseModel();
+      dispatchBuild(tmp);
+      m = tmp;
+    } catch (e) { m = null; }
+    if (!m || !m.model.pullup) { window.Diagram.render(null); return; }
+    const mo = m.model;
+    const peak = function (a) { return (a || []).reduce(function (x, r) { return Math.max(x, r.typ); }, 0); };
+    const L = labelsFor();
+    window.Diagram.render({
+      vcc: mo.vcc,
+      ccomp: mo.ccomp ? mo.ccomp.typ : null,
+      peakPu: peak(mo.pullup), peakPd: peak(mo.pulldown),
+      tr: mo.ramp ? mo.ramp.dtr.typ : NaN, tf: mo.ramp ? mo.ramp.dtf.typ : NaN,
+      clamps: !!(mo.gndClamp && mo.gndClamp.length),
+      pkg: { r: m.pkg.r, l: m.pkg.l, c: m.pkg.c },
+      puLabel: L.pu, pdLabel: L.pd,
+      ivPullup: mo.pullup, ivPulldown: mo.pulldown,
+      note: L.note
+    });
+  }
+
+  // Redraw live on any input/select/textarea change anywhere in the form.
+  document.addEventListener("input", updateDiagram);
+  document.addEventListener("change", updateDiagram);
+
   // ---- Generate ----
   $("generate").addEventListener("click", function () {
     try {
       const d = baseModel();
-      if (activeTab === "wl") buildFromWL(d);
-      else if (activeTab === "rf") buildFromRF(d);
-      else if (activeTab === "net") buildFromNet(d);
-      else buildFromPaste(d);
+      dispatchBuild(d);
 
       const v = window.Validate.run(d);
       renderValidation(v);
@@ -279,4 +418,7 @@
       b.textContent = "Copied!"; setTimeout(function () { b.textContent = old; }, 1200);
     });
   });
+
+  // Initial render so the diagram is populated on first load.
+  updateDiagram();
 })();

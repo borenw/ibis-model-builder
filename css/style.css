@@ -95,6 +95,35 @@ pre {
 .vmsg.warn { background: rgba(240,179,74,0.12); color: var(--warn); }
 .vmsg.err { background: rgba(255,107,107,0.12); color: var(--err); }
 
+/* ---- live diagram ---- */
+.livedot { font-size: 0.72rem; color: var(--ok); font-weight: 500; margin-left: 0.5rem; }
+.diagwrap { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+.schcol { flex: 2 1 380px; min-width: 300px; }
+.ivcol { flex: 1 1 260px; min-width: 240px; }
+.schsvg, .ivsvg { width: 100%; height: auto; }
+
+.schsvg .w { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.schsvg .comp { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+.schsvg .comp.fill { fill: var(--accent); }
+.schsvg .node { fill: var(--accent); stroke: none; }
+.schsvg text { fill: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.schsvg .rail { font-size: 12px; fill: var(--muted); }
+.schsvg .dev { font-size: 12px; font-weight: 600; fill: var(--accent); }
+.schsvg .sub { font-size: 10.5px; fill: var(--muted); }
+.schsvg .node { }
+.schsvg text.node { font-size: 11px; font-weight: 600; fill: var(--ok); }
+.schsvg .ramp { font-size: 11px; fill: var(--ink); }
+
+.ivsvg .ax { stroke: var(--muted); stroke-width: 1; }
+.ivsvg text { fill: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+.ivsvg .axt { font-size: 10px; text-anchor: middle; }
+.ivsvg .leg { font-size: 10px; }
+.ivsvg .curve { fill: none; stroke-width: 2; }
+.ivsvg .cd { stroke: var(--accent); }
+.ivsvg .cu { stroke: var(--warn); }
+.ivsvg rect.cd { fill: var(--accent); stroke: none; }
+.ivsvg rect.cu { fill: var(--warn); stroke: none; }
+
 footer { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 3rem; color: var(--muted); font-size: 0.8rem; }
 footer a { color: var(--accent); }
 

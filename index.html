@@ -62,6 +62,7 @@
       <button class="tab" data-tab="rf">Rise / Fall @ load</button>
       <button class="tab" data-tab="paste">Paste I&#8209;V / V&#8209;t</button>
       <button class="tab" data-tab="net">Paste SPICE netlist</button>
+      <button class="tab" data-tab="cad">Cadence schematic</button>
     </div>
 
     <!-- W/L -->
@@ -141,7 +142,36 @@
       </div>
     </div>
 
+    <!-- Cadence -->
+    <div class="panel" id="panel-cad">
+      <div class="vmsg warn" style="margin-bottom:0.8rem">⚠ A browser can't read a Cadence OA database or a filesystem path directly. Enter your cell + pin below and this generates a <strong>Virtuoso SKILL/OCEAN script</strong> that netlists the cell and prints the pin's driver W/L. Run it in the CIW, then paste the numbers (or the netlist) back here.</div>
+      <div class="grid">
+        <label>Library<input id="cad_lib" value="my_lib"></label>
+        <label>Cell<input id="cad_cell" value="io_buffer"></label>
+        <label>View<input id="cad_view" value="schematic"></label>
+        <label>Pin name (the PAD)<input id="cad_pin" value="PAD"></label>
+      </div>
+      <button id="genSkill" class="secondary">📜 Generate Virtuoso SKILL/OCEAN script</button>
+      <div id="cad_skillwrap" hidden>
+        <div class="outbar" style="margin-top:0.8rem"><button id="copySkill">Copy script</button></div>
+        <pre id="cad_skill"></pre>
+        <p class="note">Run the above in the Virtuoso CIW. It prints lines like <code>PAD driver: pfet W=… L=… / nfet W=… L=…</code> and writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Then either paste the netlist there, or enter the W/L below to build directly.</p>
+      </div>
+      <div class="grid" style="margin-top:0.8rem">
+        <label>Process node<select id="cad_node"></select></label>
+        <label>Pulldown NMOS W/L<input id="cad_wlN" type="number" step="0.1" placeholder="from script"></label>
+        <label>Pullup PMOS W/L<input id="cad_wlP" type="number" step="0.1" placeholder="from script"></label>
+        <label>C_comp override (pF, blank = estimate)<input id="cad_ccomp" type="number" step="0.1" placeholder="auto"></label>
+      </div>
+    </div>
+
     <button id="generate" class="primary">Generate IBIS model &rarr;</button>
+  </section>
+
+  <!-- ============ Live diagram ============ -->
+  <section class="card">
+    <h2>Live model preview <span class="livedot">● updates as you type</span></h2>
+    <div id="diagram"><p class="note">Enter inputs above to see the live model diagram.</p></div>
   </section>
 
   <!-- ============ Output ============ -->
@@ -165,6 +195,7 @@
 <script src="js/square-law.js"></script>
 <script src="js/risefall.js"></script>
 <script src="js/netlist.js"></script>
+<script src="js/diagram.js"></script>
 <script src="js/validate.js"></script>
 <script src="js/app.js"></script>
 </body>

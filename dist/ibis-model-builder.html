@@ -102,6 +102,35 @@ pre {
 .vmsg.warn { background: rgba(240,179,74,0.12); color: var(--warn); }
 .vmsg.err { background: rgba(255,107,107,0.12); color: var(--err); }
 
+/* ---- live diagram ---- */
+.livedot { font-size: 0.72rem; color: var(--ok); font-weight: 500; margin-left: 0.5rem; }
+.diagwrap { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+.schcol { flex: 2 1 380px; min-width: 300px; }
+.ivcol { flex: 1 1 260px; min-width: 240px; }
+.schsvg, .ivsvg { width: 100%; height: auto; }
+
+.schsvg .w { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.schsvg .comp { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+.schsvg .comp.fill { fill: var(--accent); }
+.schsvg .node { fill: var(--accent); stroke: none; }
+.schsvg text { fill: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.schsvg .rail { font-size: 12px; fill: var(--muted); }
+.schsvg .dev { font-size: 12px; font-weight: 600; fill: var(--accent); }
+.schsvg .sub { font-size: 10.5px; fill: var(--muted); }
+.schsvg .node { }
+.schsvg text.node { font-size: 11px; font-weight: 600; fill: var(--ok); }
+.schsvg .ramp { font-size: 11px; fill: var(--ink); }
+
+.ivsvg .ax { stroke: var(--muted); stroke-width: 1; }
+.ivsvg text { fill: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+.ivsvg .axt { font-size: 10px; text-anchor: middle; }
+.ivsvg .leg { font-size: 10px; }
+.ivsvg .curve { fill: none; stroke-width: 2; }
+.ivsvg .cd { stroke: var(--accent); }
+.ivsvg .cu { stroke: var(--warn); }
+.ivsvg rect.cd { fill: var(--accent); stroke: none; }
+.ivsvg rect.cu { fill: var(--warn); stroke: none; }
+
 footer { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 3rem; color: var(--muted); font-size: 0.8rem; }
 footer a { color: var(--accent); }
 
@@ -171,6 +200,7 @@ footer a { color: var(--accent); }
       <button class="tab" data-tab="rf">Rise / Fall @ load</button>
       <button class="tab" data-tab="paste">Paste I&#8209;V / V&#8209;t</button>
       <button class="tab" data-tab="net">Paste SPICE netlist</button>
+      <button class="tab" data-tab="cad">Cadence schematic</button>
     </div>
 
     <!-- W/L -->
@@ -250,7 +280,36 @@ footer a { color: var(--accent); }
       </div>
     </div>
 
+    <!-- Cadence -->
+    <div class="panel" id="panel-cad">
+      <div class="vmsg warn" style="margin-bottom:0.8rem">⚠ A browser can't read a Cadence OA database or a filesystem path directly. Enter your cell + pin below and this generates a <strong>Virtuoso SKILL/OCEAN script</strong> that netlists the cell and prints the pin's driver W/L. Run it in the CIW, then paste the numbers (or the netlist) back here.</div>
+      <div class="grid">
+        <label>Library<input id="cad_lib" value="my_lib"></label>
+        <label>Cell<input id="cad_cell" value="io_buffer"></label>
+        <label>View<input id="cad_view" value="schematic"></label>
+        <label>Pin name (the PAD)<input id="cad_pin" value="PAD"></label>
+      </div>
+      <button id="genSkill" class="secondary">📜 Generate Virtuoso SKILL/OCEAN script</button>
+      <div id="cad_skillwrap" hidden>
+        <div class="outbar" style="margin-top:0.8rem"><button id="copySkill">Copy script</button></div>
+        <pre id="cad_skill"></pre>
+        <p class="note">Run the above in the Virtuoso CIW. It prints lines like <code>PAD driver: pfet W=… L=… / nfet W=… L=…</code> and writes a SPICE netlist you can paste into the <em>Paste SPICE netlist</em> tab. Then either paste the netlist there, or enter the W/L below to build directly.</p>
+      </div>
+      <div class="grid" style="margin-top:0.8rem">
+        <label>Process node<select id="cad_node"></select></label>
+        <label>Pulldown NMOS W/L<input id="cad_wlN" type="number" step="0.1" placeholder="from script"></label>
+        <label>Pullup PMOS W/L<input id="cad_wlP" type="number" step="0.1" placeholder="from script"></label>
+        <label>C_comp override (pF, blank = estimate)<input id="cad_ccomp" type="number" step="0.1" placeholder="auto"></label>
+      </div>
+    </div>
+
     <button id="generate" class="primary">Generate IBIS model &rarr;</button>
+  </section>
+
+  <!-- ============ Live diagram ============ -->
+  <section class="card">
+    <h2>Live model preview <span class="livedot">● updates as you type</span></h2>
+    <div id="diagram"><p class="note">Enter inputs above to see the live model diagram.</p></div>
   </section>
 
   <!-- ============ Output ============ -->
@@ -917,6 +976,230 @@ window.PROCESS_LIBRARY = {
 </script>
 <script>
 /*
+ * diagram.js
+ * ------------------------------------------------------------------
+ * Live schematic of the IBIS I/O-buffer model. Redraws in real time
+ * (before the user clicks Generate) from a lightweight summary of the
+ * current inputs, labelling every component with its present value:
+ *   PMOS pull-up, NMOS pull-down, PAD node, C_comp, POWER/GND clamp
+ *   diodes, package R/L/C, external pin -- plus a mini pull-up/pull-
+ *   down I-V preview.
+ *
+ * Pure rendering: app.js assembles the `data` summary and calls
+ * Diagram.render(data). data === null renders a neutral placeholder.
+ * ------------------------------------------------------------------
+ */
+(function () {
+  "use strict";
+
+  function eng(x, unit) {
+    if (x == null || !isFinite(x)) return "?";
+    const a = Math.abs(x);
+    const p = [
+      [1e-15, "f"], [1e-12, "p"], [1e-9, "n"], [1e-6, "µ"], [1e-3, "m"],
+      [1, ""], [1e3, "k"], [1e6, "M"]
+    ];
+    let best = p[5];
+    for (let i = 0; i < p.length; i++) if (a >= p[i][0]) best = p[i];
+    if (a === 0) best = p[5];
+    const v = x / best[0];
+    return (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2)) + " " + best[1] + (unit || "");
+  }
+  const ns = function (t) { return isFinite(t) ? (t * 1e9).toFixed(2) + " ns" : "?"; };
+
+  // ---------- SVG primitives ----------
+  function wire(x1, y1, x2, y2) {
+    return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" class="w"/>';
+  }
+  function dot(x, y) { return '<circle cx="' + x + '" cy="' + y + '" r="3.5" class="node"/>'; }
+  function txt(x, y, s, cls) { return '<text x="' + x + '" y="' + y + '" class="' + (cls || "lbl") + '">' + s + '</text>'; }
+
+  // Horizontal resistor between (x1) and (x2) at y.
+  function resistorH(x1, x2, y) {
+    const n = 6, step = (x2 - x1) / n; let d = "M" + x1 + " " + y;
+    for (let i = 0; i < n; i++) {
+      const xa = x1 + step * i, xb = x1 + step * (i + 0.5), xc = x1 + step * (i + 1);
+      d += " L" + xb + " " + (y + (i % 2 ? 7 : -7)) + " L" + xc + " " + y;
+    }
+    return '<path d="' + d + '" class="comp"/>';
+  }
+  // Horizontal inductor (loops) between x1..x2 at y.
+  function inductorH(x1, x2, y) {
+    const n = 4, w = (x2 - x1) / n; let d = "M" + x1 + " " + y;
+    for (let i = 0; i < n; i++) {
+      const cx = x1 + w * i;
+      d += " A" + (w / 2) + " " + (w / 2) + " 0 0 1 " + (cx + w) + " " + y;
+    }
+    return '<path d="' + d + '" class="comp"/>';
+  }
+  // Vertical capacitor centred at x, plates around y (top plate near yTop).
+  function capV(x, yTop, yBot) {
+    const midT = (yTop + yBot) / 2 - 5, midB = (yTop + yBot) / 2 + 5;
+    return wire(x, yTop, x, midT) + wire(x, midB, x, yBot) +
+      '<line x1="' + (x - 12) + '" y1="' + midT + '" x2="' + (x + 12) + '" y2="' + midT + '" class="comp"/>' +
+      '<line x1="' + (x - 12) + '" y1="' + midB + '" x2="' + (x + 12) + '" y2="' + midB + '" class="comp"/>';
+  }
+  // Vertical diode centred at x from yA..yB. dir "up" = arrow/anode at bottom
+  // (conducts bottom->top). dir "down" = anode at top.
+  function diodeV(x, yA, yB, dir) {
+    const mid = (yA + yB) / 2;
+    const t = 11;
+    let tri, bar;
+    if (dir === "up") { // anode bottom, cathode top
+      tri = "M" + (x - t) + " " + (mid + t) + " L" + (x + t) + " " + (mid + t) + " L" + x + " " + (mid - t) + " Z";
+      bar = '<line x1="' + (x - t) + '" y1="' + (mid - t) + '" x2="' + (x + t) + '" y2="' + (mid - t) + '" class="comp"/>';
+    } else { // anode top, cathode bottom
+      tri = "M" + (x - t) + " " + (mid - t) + " L" + (x + t) + " " + (mid - t) + " L" + x + " " + (mid + t) + " Z";
+      bar = '<line x1="' + (x - t) + '" y1="' + (mid + t) + '" x2="' + (x + t) + '" y2="' + (mid + t) + '" class="comp"/>';
+    }
+    return wire(x, yA, x, mid - t) + wire(x, mid + t, x, yB) +
+      '<path d="' + tri + '" class="comp fill"/>' + bar;
+  }
+  // MOSFET symbol centred at (cx,cy). type "P" or "N". Top & bottom terminals
+  // on the spine; gate stub to the left. Returns svg.
+  function fet(cx, cy, type) {
+    const g = [];
+    const top = cy - 34, bot = cy + 34;
+    // channel bar (vertical) at cx-6, gate bar at cx-14
+    g.push('<line x1="' + (cx - 6) + '" y1="' + (cy - 22) + '" x2="' + (cx - 6) + '" y2="' + (cy + 22) + '" class="comp"/>');
+    g.push('<line x1="' + (cx - 14) + '" y1="' + (cy - 22) + '" x2="' + (cx - 14) + '" y2="' + (cy + 22) + '" class="comp"/>');
+    // source/drain stubs from channel to spine
+    g.push(wire(cx - 6, cy - 18, cx, cy - 18)); g.push(wire(cx, cy - 18, cx, top));
+    g.push(wire(cx - 6, cy + 18, cx, cy + 18)); g.push(wire(cx, cy + 18, cx, bot));
+    // gate wire to the left
+    g.push(wire(cx - 14, cy, cx - 40, cy));
+    // arrow indicating type (on source side)
+    const ay = type === "N" ? cy + 18 : cy - 18;
+    const adir = type === "N" ? -1 : 1; // N: arrow points into channel (left), P: out
+    g.push('<path d="M' + (cx - 3) + " " + ay + " l" + (adir * 6) + " -3 l0 6 Z\" class=\"comp fill\"/>");
+    return g.join("");
+  }
+
+  // ---------- mini I-V plot ----------
+  function ivPlot(data) {
+    const W = 300, H = 210, m = { l: 42, r: 10, t: 14, b: 30 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const vcc = data.vcc || 1.8;
+    const series = [
+      { rows: data.ivPulldown, cls: "cd", name: "pull-down" },
+      { rows: data.ivPullup, cls: "cu", name: "pull-up" }
+    ];
+    let imax = 0;
+    series.forEach(function (s) {
+      (s.rows || []).forEach(function (r) {
+        if (r.v >= 0 && r.v <= vcc + 1e-9) imax = Math.max(imax, Math.abs(r.typ));
+      });
+    });
+    if (imax <= 0) imax = 1e-3;
+    const X = function (v) { return m.l + pw * (v / vcc); };
+    const Y = function (i) { return m.t + ph * (1 - Math.abs(i) / imax); };
+    let g = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="ivsvg">';
+    // axes
+    g += '<line x1="' + m.l + '" y1="' + (m.t + ph) + '" x2="' + (m.l + pw) + '" y2="' + (m.t + ph) + '" class="ax"/>';
+    g += '<line x1="' + m.l + '" y1="' + m.t + '" x2="' + m.l + '" y2="' + (m.t + ph) + '" class="ax"/>';
+    g += txt(m.l + pw / 2, H - 6, "V_out (V)", "axt");
+    g += '<text x="12" y="' + (m.t + ph / 2) + '" class="axt" transform="rotate(-90 12 ' + (m.t + ph / 2) + ')">|I| (' + eng(imax, "A") + ' fs)</text>';
+    series.forEach(function (s) {
+      const rows = (s.rows || []).filter(function (r) { return r.v >= -1e-9 && r.v <= vcc + 1e-9; });
+      if (rows.length < 2) return;
+      let d = "";
+      rows.forEach(function (r, i) { d += (i ? " L" : "M") + X(r.v).toFixed(1) + " " + Y(r.typ).toFixed(1); });
+      g += '<path d="' + d + '" class="curve ' + s.cls + '"/>';
+    });
+    // legend
+    g += '<rect x="' + (m.l + 6) + '" y="' + (m.t + 2) + '" width="10" height="3" class="curve cd"/>' + txt(m.l + 20, m.t + 8, "pull-down", "leg");
+    g += '<rect x="' + (m.l + 6) + '" y="' + (m.t + 14) + '" width="10" height="3" class="curve cu"/>' + txt(m.l + 20, m.t + 20, "pull-up", "leg");
+    g += '</svg>';
+    return g;
+  }
+
+  // ---------- main schematic ----------
+  function schematic(data) {
+    const VDD = 45, GND = 400, PADy = 222;
+    const railL = 70, railR = 580;
+    const colX = 150, cX = 250, clX = 330, rX = 405, lX = 470, pinX = 545;
+    let g = '<svg viewBox="0 0 640 440" class="schsvg">';
+
+    // rails
+    g += wire(railL, VDD, railR, VDD) + wire(railL, GND, railR, GND);
+    g += txt(railL, VDD - 8, "VDD = " + (data.vcc != null ? data.vcc + " V" : "?"), "rail");
+    g += txt(railL, GND + 20, "GND", "rail");
+
+    // device column spine
+    g += wire(colX, VDD, colX, GND);
+    g += fet(colX, 120, "P") + fet(colX, 320, "N");
+    g += dot(colX, PADy);
+
+    // input to gates
+    g += wire(70, PADy, 70, 120) + wire(70, 120, colX - 40, 120);   // to PMOS gate
+    g += wire(70, PADy, 70, 320) + wire(70, 320, colX - 40, 320);   // to NMOS gate
+    g += txt(46, PADy + 4, "IN", "rail");
+
+    // labels for the two devices
+    g += txt(colX + 12, 108, "PMOS pull-up", "dev");
+    g += txt(colX + 12, 124, data.puLabel || "", "sub");
+    g += txt(colX + 12, 140, "I_pk " + eng(data.peakPu, "A"), "sub");
+    g += txt(colX + 12, 308, "NMOS pull-down", "dev");
+    g += txt(colX + 12, 324, data.pdLabel || "", "sub");
+    g += txt(colX + 12, 340, "I_pk " + eng(data.peakPd, "A"), "sub");
+
+    // PAD horizontal wire out to package/pin
+    g += wire(colX, PADy, 380, PADy);
+    g += txt(colX + 4, PADy - 10, "PAD", "node");
+
+    // C_comp tap at cX
+    g += capV(cX, PADy, GND);
+    g += txt(cX + 16, (PADy + GND) / 2, "C_comp", "sub");
+    g += txt(cX + 16, (PADy + GND) / 2 + 14, eng(data.ccomp, "F"), "sub");
+
+    // clamps at clX (up to VDD = POWER clamp; down to GND = GND clamp)
+    if (data.clamps) {
+      g += diodeV(clX, PADy, VDD, "up");     // POWER clamp: anode PAD, cathode VDD
+      g += diodeV(clX, PADy, GND, "up");     // GND clamp: anode GND, cathode PAD
+      g += txt(clX + 14, 70, "POWER", "sub"); g += txt(clX + 14, 82, "clamp", "sub");
+      g += txt(clX + 14, GND - 24, "GND", "sub"); g += txt(clX + 14, GND - 12, "clamp", "sub");
+    } else {
+      g += txt(clX - 20, PADy - 26, "(no clamps modelled)", "sub");
+    }
+
+    // package: R_pkg, L_pkg in series; C_pkg to GND at pin
+    g += resistorH(380, rX + 25, PADy);
+    g += inductorH(rX + 35, lX + 40, PADy);
+    g += wire(lX + 40, PADy, pinX, PADy);
+    g += dot(pinX, PADy);
+    g += capV(pinX, PADy, GND);
+    g += txt(385, PADy - 10, "R_pkg " + eng(data.pkg ? data.pkg.r : null, "Ω"), "sub");
+    g += txt(rX + 35, PADy - 10, "L_pkg " + eng(data.pkg ? data.pkg.l : null, "H"), "sub");
+    g += txt(pinX + 8, PADy + 4, "PIN", "node");
+    g += txt(pinX - 6, (PADy + GND) / 2 + 14, "C_pkg " + eng(data.pkg ? data.pkg.c : null, "F"), "sub");
+
+    // ramp readout box
+    g += txt(railL, 428, "dV/dt_r: 0.6·Vcc / " + ns(data.tr) + "     dV/dt_f: 0.6·Vcc / " + ns(data.tf), "ramp");
+
+    g += '</svg>';
+    return g;
+  }
+
+  window.Diagram = {
+    render: function (data) {
+      const host = document.getElementById("diagram");
+      if (!host) return;
+      if (!data) {
+        host.innerHTML = '<p class="note">Enter inputs above to see the live model diagram.</p>';
+        return;
+      }
+      host.innerHTML =
+        '<div class="diagwrap">' +
+        '<div class="schcol">' + schematic(data) + '</div>' +
+        '<div class="ivcol">' + ivPlot(data) + (data.note ? '<p class="note">' + data.note + '</p>' : '') + '</div>' +
+        '</div>';
+    }
+  };
+})();
+
+</script>
+<script>
+/*
  * validate.js
  * ------------------------------------------------------------------
  * Lightweight sanity checks on the assembled model data. This is NOT
@@ -1008,6 +1291,16 @@ window.PROCESS_LIBRARY = {
   });
   netNodeSel.value = "sky130";
 
+  const cadNodeSel = $("net_node") && $("cad_node");
+  if (cadNodeSel) {
+    Object.keys(window.PROCESS_LIBRARY).forEach(function (key) {
+      const o = document.createElement("option");
+      o.value = key; o.textContent = window.PROCESS_LIBRARY[key].label;
+      cadNodeSel.appendChild(o);
+    });
+    cadNodeSel.value = "sky130";
+  }
+
   function loadNodeParams() {
     const p = window.PROCESS_LIBRARY[nodeSel.value];
     $("nodeNote").textContent = p.note;
@@ -1031,6 +1324,7 @@ window.PROCESS_LIBRARY = {
       document.querySelectorAll(".panel").forEach(function (p) { p.classList.remove("active"); });
       btn.classList.add("active");
       $("panel-" + activeTab).classList.add("active");
+      updateDiagram();
     });
   });
 
@@ -1160,6 +1454,7 @@ window.PROCESS_LIBRARY = {
     if (r.output.pDev) info.push("Pullup: " + r.output.pDev.name + " (W/L=" + fmtWL(r.output.pDev) + ")");
     $("net_devinfo").textContent = info.join("  ·  ");
     $("netResult").hidden = false;
+    updateDiagram();
   });
 
   function fmtWL(dv) {
@@ -1182,6 +1477,83 @@ window.PROCESS_LIBRARY = {
     d.provenance = "Parsed from SPICE netlist. PAD=" + $("net_pad").value +
       ", VDD=" + $("net_vdd").value + ", GND=" + $("net_gnd").value +
       "; square-law on node=" + netNodeSel.value + ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
+  }
+
+  // ---- Cadence tab: generate a SKILL/OCEAN extraction script ----
+  function skillScript(lib, cell, view, pin) {
+    return [
+      ";; ===================================================================",
+      ";; IBIS Model Builder -- extract PAD driver W/L from a Virtuoso cell",
+      ";; Paste into the Virtuoso CIW and press Enter. Run from a shell with",
+      ";; the PDK loaded so the netlister and CDF params are available.",
+      ";; ===================================================================",
+      'lib  = "' + lib + '"',
+      'cell = "' + cell + '"',
+      'view = "' + view + '"',
+      'pin  = "' + pin + '"    ; the PAD / I-O net name',
+      "",
+      ";; 1) Netlist the cell to SPICE so you can paste it into the",
+      ";;    'Paste SPICE netlist' tab (which auto-detects the PAD):",
+      "simulator( 'spectre )",
+      "design( lib cell view )",
+      'resultsDir( strcat( "/tmp/" cell "_ibis" ) )',
+      "createNetlist( ?recreateAll t ?display nil )",
+      'printf("\\nSPICE netlist written under /tmp/%s_ibis -- open input.scs / netlist and paste it into the web tool.\\n" cell)',
+      "",
+      ";; 2) Print the W/L of every FET whose drain touches the PAD net",
+      ";;    (the push-pull output devices). Param names vary by PDK --",
+      ";;    adjust w/l below if your models use fw/nf/etc.",
+      'cv = dbOpenCellViewByType( lib cell view "" "r" )',
+      "theNet = car( setof( n cv~>nets  n~>name == pin ) )",
+      "when( theNet",
+      "  foreach( iterm theNet~>instTerms",
+      "    inst  = iterm~>inst",
+      "    mname = inst~>master~>cellName",
+      '    when( rexMatchp( "fet\\\\|mos\\\\|nch\\\\|pch" lower(mname) )',
+      '      w = dbReadCDFParam( inst "w" ) || inst~>w',
+      '      l = dbReadCDFParam( inst "l" ) || inst~>l',
+      '      printf("PAD driver: %-22s model=%-28s W=%L  L=%L\\n" inst~>name mname w l)',
+      "    )",
+      "  )",
+      ")",
+      'printf("Copy the W and L above into the W/L fields, or paste the netlist into the netlist tab.\\n")'
+    ].join("\n");
+  }
+
+  if ($("genSkill")) {
+    $("genSkill").addEventListener("click", function () {
+      const s = skillScript(
+        $("cad_lib").value.trim() || "my_lib",
+        $("cad_cell").value.trim() || "io_buffer",
+        $("cad_view").value.trim() || "schematic",
+        $("cad_pin").value.trim() || "PAD"
+      );
+      $("cad_skill").textContent = s;
+      $("cad_skillwrap").hidden = false;
+    });
+    $("copySkill").addEventListener("click", function () {
+      navigator.clipboard.writeText($("cad_skill").textContent).then(function () {
+        const b = $("copySkill"); const o = b.textContent; b.textContent = "Copied!";
+        setTimeout(function () { b.textContent = o; }, 1200);
+      });
+    });
+  }
+
+  function buildFromCadence(d) {
+    const base = window.PROCESS_LIBRARY[$("cad_node").value];
+    const params = {
+      vdd: base.vdd, vthn: base.vthn, vthp: base.vthp,
+      kpn: base.kpn, kpp: base.kpp, lambdan: base.lambdan, lambdap: base.lambdap, cox: base.cox
+    };
+    const wlN = parseFloat($("cad_wlN").value), wlP = parseFloat($("cad_wlP").value);
+    if (!(wlN > 0) || !(wlP > 0))
+      throw new Error("Enter the NMOS/PMOS W/L from the SKILL script output first.");
+    const ccompOv = $("cad_ccomp").value ? parseFloat($("cad_ccomp").value) * 1e-12 : null;
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    applyElectrical(d, params.vdd, r);
+    d.provenance = "From Cadence cell " + $("cad_lib").value + "/" + $("cad_cell").value +
+      " pin " + $("cad_pin").value + "; square-law on node=" + $("cad_node").value +
+      ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
   }
 
   function applyElectrical(d, vcc, r) {
@@ -1214,14 +1586,64 @@ window.PROCESS_LIBRARY = {
     block("ok", v.ok, "✔");
   }
 
+  function dispatchBuild(d) {
+    if (activeTab === "wl") buildFromWL(d);
+    else if (activeTab === "rf") buildFromRF(d);
+    else if (activeTab === "net") buildFromNet(d);
+    else if (activeTab === "cad") buildFromCadence(d);
+    else buildFromPaste(d);
+  }
+
+  // ---- Live diagram (updates on every input change, before Generate) ----
+  function labelsFor() {
+    if (activeTab === "wl")
+      return { pu: "W/L = " + ($("wlP").value || "?"), pd: "W/L = " + ($("wlN").value || "?"),
+               note: "Square-law estimate from device geometry." };
+    if (activeTab === "net")
+      return { pu: "W/L = " + ($("net_wlP").value || "?"), pd: "W/L = " + ($("net_wlN").value || "?"),
+               note: "Parsed from netlist; square-law on extracted W/L." };
+    if (activeTab === "cad")
+      return { pu: "W/L = " + ($("cad_wlP").value || "?"), pd: "W/L = " + ($("cad_wlN").value || "?"),
+               note: "From Cadence cell; square-law on entered W/L." };
+    if (activeTab === "rf")
+      return { pu: "linear driver (from edges)", pd: "linear driver (from edges)",
+               note: "Reconstructed from measured rise/fall times." };
+    return { pu: "from I-V data", pd: "from I-V data", note: "Assembled from pasted I-V / edge data." };
+  }
+
+  function updateDiagram() {
+    let m = null;
+    try {
+      const tmp = baseModel();
+      dispatchBuild(tmp);
+      m = tmp;
+    } catch (e) { m = null; }
+    if (!m || !m.model.pullup) { window.Diagram.render(null); return; }
+    const mo = m.model;
+    const peak = function (a) { return (a || []).reduce(function (x, r) { return Math.max(x, r.typ); }, 0); };
+    const L = labelsFor();
+    window.Diagram.render({
+      vcc: mo.vcc,
+      ccomp: mo.ccomp ? mo.ccomp.typ : null,
+      peakPu: peak(mo.pullup), peakPd: peak(mo.pulldown),
+      tr: mo.ramp ? mo.ramp.dtr.typ : NaN, tf: mo.ramp ? mo.ramp.dtf.typ : NaN,
+      clamps: !!(mo.gndClamp && mo.gndClamp.length),
+      pkg: { r: m.pkg.r, l: m.pkg.l, c: m.pkg.c },
+      puLabel: L.pu, pdLabel: L.pd,
+      ivPullup: mo.pullup, ivPulldown: mo.pulldown,
+      note: L.note
+    });
+  }
+
+  // Redraw live on any input/select/textarea change anywhere in the form.
+  document.addEventListener("input", updateDiagram);
+  document.addEventListener("change", updateDiagram);
+
   // ---- Generate ----
   $("generate").addEventListener("click", function () {
     try {
       const d = baseModel();
-      if (activeTab === "wl") buildFromWL(d);
-      else if (activeTab === "rf") buildFromRF(d);
-      else if (activeTab === "net") buildFromNet(d);
-      else buildFromPaste(d);
+      dispatchBuild(d);
 
       const v = window.Validate.run(d);
       renderValidation(v);
@@ -1256,6 +1678,9 @@ window.PROCESS_LIBRARY = {
       b.textContent = "Copied!"; setTimeout(function () { b.textContent = old; }, 1200);
     });
   });
+
+  // Initial render so the diagram is populated on first load.
+  updateDiagram();
 })();
 
 </script>
