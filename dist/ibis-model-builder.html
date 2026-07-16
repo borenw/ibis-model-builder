@@ -55,6 +55,24 @@ code { background: rgba(255,255,255,0.07); padding: 0.05em 0.35em; border-radius
 
 main { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 3rem; }
 
+.toc {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 0.9rem 1.25rem; margin-bottom: 1.25rem;
+}
+.toc-h {
+  display: block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 0.4rem;
+}
+.toc ol { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.3rem 1.4rem; }
+.toc li { font-size: 0.9rem; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.toc-sub { display: block; margin-top: 0.2rem; font-size: 0.8rem; color: var(--muted); }
+.toc-sub a { color: var(--muted); }
+.toc-sub a:hover { color: var(--accent); }
+html { scroll-behavior: smooth; }
+:target { scroll-margin-top: 1rem; }
+
 .card {
   background: var(--card); border: 1px solid var(--line);
   border-radius: 14px; padding: 1.25rem 1.25rem 1.5rem; margin-bottom: 1.25rem;
@@ -196,8 +214,26 @@ footer a { color: var(--accent); }
 </div>
 
 <main>
+  <!-- ============ Index ============ -->
+  <nav class="toc" aria-label="Page index">
+    <span class="toc-h">Index</span>
+    <ol>
+      <li><a href="#sec-model">1 · Component &amp; model</a></li>
+      <li><a href="#sec-input">2 · Input data
+        <span class="toc-sub">
+          <a href="#panel-wl" data-tab="wl">W/L + process</a> ·
+          <a href="#panel-rf" data-tab="rf">Rise/Fall</a> ·
+          <a href="#panel-paste" data-tab="paste">Paste I‑V</a> ·
+          <a href="#panel-net" data-tab="net">SPICE netlist</a> ·
+          <a href="#panel-cad" data-tab="cad">Cadence</a>
+        </span></li>
+      <li><a href="#sec-preview">3 · Live model preview</a></li>
+      <li><a href="#outCard">4 · Output .ibs</a></li>
+    </ol>
+  </nav>
+
   <!-- ============ Shared settings ============ -->
-  <section class="card">
+  <section class="card" id="sec-model">
     <h2>1 &middot; Component &amp; model</h2>
     <div class="grid">
       <label>Component name<input id="component" value="MyChip"></label>
@@ -234,7 +270,7 @@ footer a { color: var(--accent); }
   </section>
 
   <!-- ============ Input method tabs ============ -->
-  <section class="card">
+  <section class="card" id="sec-input">
     <h2>2 &middot; Where does the data come from?</h2>
     <div class="tabs">
       <button class="tab active" data-tab="wl">Device W/L + Process</button>
@@ -350,7 +386,7 @@ footer a { color: var(--accent); }
   </section>
 
   <!-- ============ Live diagram ============ -->
-  <section class="card">
+  <section class="card" id="sec-preview">
     <h2>Live model preview <span class="livedot">● updates as you type</span></h2>
     <div id="diagram"><p class="note">Enter inputs above to see the live model diagram.</p></div>
   </section>
@@ -1329,7 +1365,7 @@ window.PROCESS_LIBRARY = {
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.4";
+  const APP_REV = "v1.5";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -1388,6 +1424,15 @@ window.PROCESS_LIBRARY = {
       btn.classList.add("active");
       $("panel-" + activeTab).classList.add("active");
       updateDiagram();
+    });
+  });
+
+  // Index sub-links (data-tab) also activate the matching input tab.
+  document.querySelectorAll('.toc-sub a[data-tab]').forEach(function (a) {
+    a.addEventListener("click", function () {
+      const t = a.dataset.tab;
+      const btn = document.querySelector('.tab[data-tab="' + t + '"]');
+      if (btn) btn.click();
     });
   });
 

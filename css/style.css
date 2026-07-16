@@ -48,6 +48,24 @@ code { background: rgba(255,255,255,0.07); padding: 0.05em 0.35em; border-radius
 
 main { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 3rem; }
 
+.toc {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 0.9rem 1.25rem; margin-bottom: 1.25rem;
+}
+.toc-h {
+  display: block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 0.4rem;
+}
+.toc ol { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.3rem 1.4rem; }
+.toc li { font-size: 0.9rem; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.toc-sub { display: block; margin-top: 0.2rem; font-size: 0.8rem; color: var(--muted); }
+.toc-sub a { color: var(--muted); }
+.toc-sub a:hover { color: var(--accent); }
+html { scroll-behavior: smooth; }
+:target { scroll-margin-top: 1rem; }
+
 .card {
   background: var(--card); border: 1px solid var(--line);
   border-radius: 14px; padding: 1.25rem 1.25rem 1.5rem; margin-bottom: 1.25rem;

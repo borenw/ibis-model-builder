@@ -10,7 +10,7 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.4";
+  const APP_REV = "v1.5";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -69,6 +69,15 @@
       btn.classList.add("active");
       $("panel-" + activeTab).classList.add("active");
       updateDiagram();
+    });
+  });
+
+  // Index sub-links (data-tab) also activate the matching input tab.
+  document.querySelectorAll('.toc-sub a[data-tab]').forEach(function (a) {
+    a.addEventListener("click", function () {
+      const t = a.dataset.tab;
+      const btn = document.querySelector('.tab[data-tab="' + t + '"]');
+      if (btn) btn.click();
     });
   });
 

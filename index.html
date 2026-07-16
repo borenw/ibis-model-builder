@@ -18,8 +18,26 @@
 </div>
 
 <main>
+  <!-- ============ Index ============ -->
+  <nav class="toc" aria-label="Page index">
+    <span class="toc-h">Index</span>
+    <ol>
+      <li><a href="#sec-model">1 · Component &amp; model</a></li>
+      <li><a href="#sec-input">2 · Input data
+        <span class="toc-sub">
+          <a href="#panel-wl" data-tab="wl">W/L + process</a> ·
+          <a href="#panel-rf" data-tab="rf">Rise/Fall</a> ·
+          <a href="#panel-paste" data-tab="paste">Paste I‑V</a> ·
+          <a href="#panel-net" data-tab="net">SPICE netlist</a> ·
+          <a href="#panel-cad" data-tab="cad">Cadence</a>
+        </span></li>
+      <li><a href="#sec-preview">3 · Live model preview</a></li>
+      <li><a href="#outCard">4 · Output .ibs</a></li>
+    </ol>
+  </nav>
+
   <!-- ============ Shared settings ============ -->
-  <section class="card">
+  <section class="card" id="sec-model">
     <h2>1 &middot; Component &amp; model</h2>
     <div class="grid">
       <label>Component name<input id="component" value="MyChip"></label>
@@ -56,7 +74,7 @@
   </section>
 
   <!-- ============ Input method tabs ============ -->
-  <section class="card">
+  <section class="card" id="sec-input">
     <h2>2 &middot; Where does the data come from?</h2>
     <div class="tabs">
       <button class="tab active" data-tab="wl">Device W/L + Process</button>
@@ -172,7 +190,7 @@
   </section>
 
   <!-- ============ Live diagram ============ -->
-  <section class="card">
+  <section class="card" id="sec-preview">
     <h2>Live model preview <span class="livedot">● updates as you type</span></h2>
     <div id="diagram"><p class="note">Enter inputs above to see the live model diagram.</p></div>
   </section>
