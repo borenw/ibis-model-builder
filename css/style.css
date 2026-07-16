@@ -10,6 +10,14 @@
   --ok: #3ecb8c;
   --warn: #f0b34a;
   --err: #ff6b6b;
+  /* shared component palette — used by BOTH the schematic and the .ibs output */
+  --c-pu:   #f0b34a;   /* Pull-up  / PMOS   */
+  --c-pd:   #4da3ff;   /* Pull-down / NMOS  */
+  --c-pwr:  #3ecb8c;   /* POWER clamp diode */
+  --c-gnd:  #b98cff;   /* GND clamp diode   */
+  --c-cc:   #2fc2c6;   /* C_comp / C_pkg    */
+  --c-pkg:  #9aa7bd;   /* package R/L       */
+  --c-ramp: #ff9e64;   /* ramp              */
 }
 * { box-sizing: border-box; }
 body {
@@ -103,26 +111,49 @@ pre {
 .schsvg, .ivsvg { width: 100%; height: auto; }
 
 .schsvg .w { stroke: var(--muted); stroke-width: 1.4; fill: none; }
-.schsvg .comp { stroke: var(--accent); stroke-width: 1.8; fill: none; }
-.schsvg .comp.fill { fill: var(--accent); }
+.schsvg [class*="c-"], .schsvg .comp { stroke-width: 1.8; fill: none; }
+/* per-component stroke/fill colors (shared palette) */
+.schsvg .c-pu   { stroke: var(--c-pu); }   .schsvg .c-pu.fill   { fill: var(--c-pu); }
+.schsvg .c-pd   { stroke: var(--c-pd); }   .schsvg .c-pd.fill   { fill: var(--c-pd); }
+.schsvg .c-pwr  { stroke: var(--c-pwr); }  .schsvg .c-pwr.fill  { fill: var(--c-pwr); }
+.schsvg .c-gnd  { stroke: var(--c-gnd); }  .schsvg .c-gnd.fill  { fill: var(--c-gnd); }
+.schsvg .c-cc   { stroke: var(--c-cc); }   .schsvg .c-cc.fill   { fill: var(--c-cc); }
+.schsvg .c-pkg  { stroke: var(--c-pkg); }  .schsvg .c-pkg.fill  { fill: var(--c-pkg); }
+.schsvg .comp { stroke: var(--accent); }   .schsvg .comp.fill { fill: var(--accent); }
 .schsvg .node { fill: var(--accent); stroke: none; }
 .schsvg text { fill: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .schsvg .rail { font-size: 12px; fill: var(--muted); }
-.schsvg .dev { font-size: 12px; font-weight: 600; fill: var(--accent); }
 .schsvg .sub { font-size: 10.5px; fill: var(--muted); }
-.schsvg .node { }
 .schsvg text.node { font-size: 11px; font-weight: 600; fill: var(--ok); }
-.schsvg .ramp { font-size: 11px; fill: var(--ink); }
+.schsvg .ramp { font-size: 11px; fill: var(--c-ramp); }
+/* device labels take the component color */
+.schsvg .t-pu { font-size: 12px; font-weight: 600; fill: var(--c-pu); }
+.schsvg .t-pd { font-size: 12px; font-weight: 600; fill: var(--c-pd); }
 
 .ivsvg .ax { stroke: var(--muted); stroke-width: 1; }
 .ivsvg text { fill: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
 .ivsvg .axt { font-size: 10px; text-anchor: middle; }
 .ivsvg .leg { font-size: 10px; }
 .ivsvg .curve { fill: none; stroke-width: 2; }
-.ivsvg .cd { stroke: var(--accent); }
-.ivsvg .cu { stroke: var(--warn); }
-.ivsvg rect.cd { fill: var(--accent); stroke: none; }
-.ivsvg rect.cu { fill: var(--warn); stroke: none; }
+.ivsvg .cd { stroke: var(--c-pd); }
+.ivsvg .cu { stroke: var(--c-pu); }
+.ivsvg rect.cd { fill: var(--c-pd); stroke: none; }
+.ivsvg rect.cu { fill: var(--c-pu); stroke: none; }
+
+/* ---- color-coded .ibs output (matches the schematic palette) ---- */
+#output .cmt { color: var(--muted); opacity: 0.65; }
+#output .kw  { color: var(--accent); font-weight: 600; }
+#output .s-pu   { color: var(--c-pu); }   #output .h-pu   { color: var(--c-pu);  font-weight: 700; }
+#output .s-pd   { color: var(--c-pd); }   #output .h-pd   { color: var(--c-pd);  font-weight: 700; }
+#output .s-pwr  { color: var(--c-pwr); }  #output .h-pwr  { color: var(--c-pwr); font-weight: 700; }
+#output .s-gnd  { color: var(--c-gnd); }  #output .h-gnd  { color: var(--c-gnd); font-weight: 700; }
+#output .s-cc   { color: var(--c-cc); }
+#output .s-pkg  { color: var(--c-pkg); }  #output .h-pkg  { color: var(--c-pkg); font-weight: 700; }
+#output .s-ramp { color: var(--c-ramp); } #output .h-ramp { color: var(--c-ramp); font-weight: 700; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem; margin: 0 0 0.7rem; font-size: 0.78rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 
 footer { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 3rem; color: var(--muted); font-size: 0.8rem; }
 footer a { color: var(--accent); }
@@ -131,6 +162,8 @@ footer a { color: var(--accent); }
   :root {
     --bg: #f5f7fb; --card: #ffffff; --card2: #eef2f9; --ink: #1a2233;
     --muted: #5b6b85; --line: #d5dced;
+    --c-pu: #c77f14; --c-pd: #2b6fd6; --c-pwr: #1f9d6b; --c-gnd: #8a5cf0;
+    --c-cc: #0f8f93; --c-pkg: #6b7890; --c-ramp: #d9741f;
   }
   pre { background: #0a0e17; color: #cdd6e6; }
 }

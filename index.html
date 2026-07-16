@@ -149,7 +149,7 @@
         <label>Library<input id="cad_lib" value="my_lib"></label>
         <label>Cell<input id="cad_cell" value="io_buffer"></label>
         <label>View<input id="cad_view" value="schematic"></label>
-        <label>Pin name (the PAD)<input id="cad_pin" value="PAD"></label>
+        <label>PAD net name / pattern (<code>*</code> = wildcard)<input id="cad_pin" value="PAD*"></label>
       </div>
       <button id="genSkill" class="secondary">📜 Generate Virtuoso SKILL/OCEAN script</button>
       <div id="cad_skillwrap" hidden>
@@ -181,6 +181,15 @@
     <div class="outbar">
       <button id="download">&#8595; Download .ibs</button>
       <button id="copy">Copy</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--c-pd)"></i>Pulldown (NMOS)</span>
+      <span><i style="background:var(--c-pu)"></i>Pullup (PMOS)</span>
+      <span><i style="background:var(--c-pwr)"></i>POWER clamp</span>
+      <span><i style="background:var(--c-gnd)"></i>GND clamp</span>
+      <span><i style="background:var(--c-cc)"></i>C_comp</span>
+      <span><i style="background:var(--c-pkg)"></i>Package R/L/C</span>
+      <span><i style="background:var(--c-ramp)"></i>Ramp</span>
     </div>
     <pre id="output"></pre>
   </section>

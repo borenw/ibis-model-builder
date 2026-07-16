@@ -38,54 +38,59 @@
   function txt(x, y, s, cls) { return '<text x="' + x + '" y="' + y + '" class="' + (cls || "lbl") + '">' + s + '</text>'; }
 
   // Horizontal resistor between (x1) and (x2) at y.
-  function resistorH(x1, x2, y) {
+  function resistorH(x1, x2, y, cls) {
+    cls = cls || "comp";
     const n = 6, step = (x2 - x1) / n; let d = "M" + x1 + " " + y;
     for (let i = 0; i < n; i++) {
       const xa = x1 + step * i, xb = x1 + step * (i + 0.5), xc = x1 + step * (i + 1);
       d += " L" + xb + " " + (y + (i % 2 ? 7 : -7)) + " L" + xc + " " + y;
     }
-    return '<path d="' + d + '" class="comp"/>';
+    return '<path d="' + d + '" class="' + cls + '"/>';
   }
   // Horizontal inductor (loops) between x1..x2 at y.
-  function inductorH(x1, x2, y) {
+  function inductorH(x1, x2, y, cls) {
+    cls = cls || "comp";
     const n = 4, w = (x2 - x1) / n; let d = "M" + x1 + " " + y;
     for (let i = 0; i < n; i++) {
       const cx = x1 + w * i;
       d += " A" + (w / 2) + " " + (w / 2) + " 0 0 1 " + (cx + w) + " " + y;
     }
-    return '<path d="' + d + '" class="comp"/>';
+    return '<path d="' + d + '" class="' + cls + '"/>';
   }
   // Vertical capacitor centred at x, plates around y (top plate near yTop).
-  function capV(x, yTop, yBot) {
+  function capV(x, yTop, yBot, cls) {
+    cls = cls || "comp";
     const midT = (yTop + yBot) / 2 - 5, midB = (yTop + yBot) / 2 + 5;
     return wire(x, yTop, x, midT) + wire(x, midB, x, yBot) +
-      '<line x1="' + (x - 12) + '" y1="' + midT + '" x2="' + (x + 12) + '" y2="' + midT + '" class="comp"/>' +
-      '<line x1="' + (x - 12) + '" y1="' + midB + '" x2="' + (x + 12) + '" y2="' + midB + '" class="comp"/>';
+      '<line x1="' + (x - 12) + '" y1="' + midT + '" x2="' + (x + 12) + '" y2="' + midT + '" class="' + cls + '"/>' +
+      '<line x1="' + (x - 12) + '" y1="' + midB + '" x2="' + (x + 12) + '" y2="' + midB + '" class="' + cls + '"/>';
   }
   // Vertical diode centred at x from yA..yB. dir "up" = arrow/anode at bottom
   // (conducts bottom->top). dir "down" = anode at top.
-  function diodeV(x, yA, yB, dir) {
+  function diodeV(x, yA, yB, dir, cls) {
+    cls = cls || "comp";
     const mid = (yA + yB) / 2;
     const t = 11;
     let tri, bar;
     if (dir === "up") { // anode bottom, cathode top
       tri = "M" + (x - t) + " " + (mid + t) + " L" + (x + t) + " " + (mid + t) + " L" + x + " " + (mid - t) + " Z";
-      bar = '<line x1="' + (x - t) + '" y1="' + (mid - t) + '" x2="' + (x + t) + '" y2="' + (mid - t) + '" class="comp"/>';
+      bar = '<line x1="' + (x - t) + '" y1="' + (mid - t) + '" x2="' + (x + t) + '" y2="' + (mid - t) + '" class="' + cls + '"/>';
     } else { // anode top, cathode bottom
       tri = "M" + (x - t) + " " + (mid - t) + " L" + (x + t) + " " + (mid - t) + " L" + x + " " + (mid + t) + " Z";
-      bar = '<line x1="' + (x - t) + '" y1="' + (mid + t) + '" x2="' + (x + t) + '" y2="' + (mid + t) + '" class="comp"/>';
+      bar = '<line x1="' + (x - t) + '" y1="' + (mid + t) + '" x2="' + (x + t) + '" y2="' + (mid + t) + '" class="' + cls + '"/>';
     }
     return wire(x, yA, x, mid - t) + wire(x, mid + t, x, yB) +
-      '<path d="' + tri + '" class="comp fill"/>' + bar;
+      '<path d="' + tri + '" class="' + cls + ' fill"/>' + bar;
   }
   // MOSFET symbol centred at (cx,cy). type "P" or "N". Top & bottom terminals
   // on the spine; gate stub to the left. Returns svg.
-  function fet(cx, cy, type) {
+  function fet(cx, cy, type, cls) {
+    cls = cls || "comp";
     const g = [];
     const top = cy - 34, bot = cy + 34;
     // channel bar (vertical) at cx-6, gate bar at cx-14
-    g.push('<line x1="' + (cx - 6) + '" y1="' + (cy - 22) + '" x2="' + (cx - 6) + '" y2="' + (cy + 22) + '" class="comp"/>');
-    g.push('<line x1="' + (cx - 14) + '" y1="' + (cy - 22) + '" x2="' + (cx - 14) + '" y2="' + (cy + 22) + '" class="comp"/>');
+    g.push('<line x1="' + (cx - 6) + '" y1="' + (cy - 22) + '" x2="' + (cx - 6) + '" y2="' + (cy + 22) + '" class="' + cls + '"/>');
+    g.push('<line x1="' + (cx - 14) + '" y1="' + (cy - 22) + '" x2="' + (cx - 14) + '" y2="' + (cy + 22) + '" class="' + cls + '"/>');
     // source/drain stubs from channel to spine
     g.push(wire(cx - 6, cy - 18, cx, cy - 18)); g.push(wire(cx, cy - 18, cx, top));
     g.push(wire(cx - 6, cy + 18, cx, cy + 18)); g.push(wire(cx, cy + 18, cx, bot));
@@ -94,7 +99,7 @@
     // arrow indicating type (on source side)
     const ay = type === "N" ? cy + 18 : cy - 18;
     const adir = type === "N" ? -1 : 1; // N: arrow points into channel (left), P: out
-    g.push('<path d="M' + (cx - 3) + " " + ay + " l" + (adir * 6) + " -3 l0 6 Z\" class=\"comp fill\"/>");
+    g.push('<path d="M' + (cx - 3) + " " + ay + " l" + (adir * 6) + " -3 l0 6 Z\" class=\"" + cls + " fill\"/>");
     return g.join("");
   }
 
@@ -150,7 +155,7 @@
 
     // device column spine
     g += wire(colX, VDD, colX, GND);
-    g += fet(colX, 120, "P") + fet(colX, 320, "N");
+    g += fet(colX, 120, "P", "c-pu") + fet(colX, 320, "N", "c-pd");
     g += dot(colX, PADy);
 
     // input to gates
@@ -158,11 +163,11 @@
     g += wire(70, PADy, 70, 320) + wire(70, 320, colX - 40, 320);   // to NMOS gate
     g += txt(46, PADy + 4, "IN", "rail");
 
-    // labels for the two devices
-    g += txt(colX + 12, 108, "PMOS pull-up", "dev");
+    // labels for the two devices (colored to match their I-V curve)
+    g += txt(colX + 12, 108, "PMOS pull-up", "t-pu");
     g += txt(colX + 12, 124, data.puLabel || "", "sub");
     g += txt(colX + 12, 140, "I_pk " + eng(data.peakPu, "A"), "sub");
-    g += txt(colX + 12, 308, "NMOS pull-down", "dev");
+    g += txt(colX + 12, 308, "NMOS pull-down", "t-pd");
     g += txt(colX + 12, 324, data.pdLabel || "", "sub");
     g += txt(colX + 12, 340, "I_pk " + eng(data.peakPd, "A"), "sub");
 
@@ -171,14 +176,14 @@
     g += txt(colX + 4, PADy - 10, "PAD", "node");
 
     // C_comp tap at cX
-    g += capV(cX, PADy, GND);
+    g += capV(cX, PADy, GND, "c-cc");
     g += txt(cX + 16, (PADy + GND) / 2, "C_comp", "sub");
     g += txt(cX + 16, (PADy + GND) / 2 + 14, eng(data.ccomp, "F"), "sub");
 
     // clamps at clX (up to VDD = POWER clamp; down to GND = GND clamp)
     if (data.clamps) {
-      g += diodeV(clX, PADy, VDD, "up");     // POWER clamp: anode PAD, cathode VDD
-      g += diodeV(clX, PADy, GND, "up");     // GND clamp: anode GND, cathode PAD
+      g += diodeV(clX, PADy, VDD, "up", "c-pwr");   // POWER clamp: anode PAD, cathode VDD
+      g += diodeV(clX, PADy, GND, "up", "c-gnd");   // GND clamp: anode GND, cathode PAD
       g += txt(clX + 14, 70, "POWER", "sub"); g += txt(clX + 14, 82, "clamp", "sub");
       g += txt(clX + 14, GND - 24, "GND", "sub"); g += txt(clX + 14, GND - 12, "clamp", "sub");
     } else {
@@ -186,11 +191,11 @@
     }
 
     // package: R_pkg, L_pkg in series; C_pkg to GND at pin
-    g += resistorH(380, rX + 25, PADy);
-    g += inductorH(rX + 35, lX + 40, PADy);
+    g += resistorH(380, rX + 25, PADy, "c-pkg");
+    g += inductorH(rX + 35, lX + 40, PADy, "c-pkg");
     g += wire(lX + 40, PADy, pinX, PADy);
     g += dot(pinX, PADy);
-    g += capV(pinX, PADy, GND);
+    g += capV(pinX, PADy, GND, "c-cc");
     g += txt(385, PADy - 10, "R_pkg " + eng(data.pkg ? data.pkg.r : null, "Ω"), "sub");
     g += txt(rX + 35, PADy - 10, "L_pkg " + eng(data.pkg ? data.pkg.l : null, "H"), "sub");
     g += txt(pinX + 8, PADy + 4, "PIN", "node");

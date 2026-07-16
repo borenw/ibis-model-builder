@@ -19,7 +19,9 @@
 
   const SUPPLY_HI = /^(vdd|vcc|vpwr|vddd|vdda|vccd|vcca|vpb|vp)$/i;
   const SUPPLY_LO = /^(vss|gnd|vgnd|vssd|vssa|vnb|vn|0)$/i;
-  const PAD_NAME  = /^(pad|out|output|io|dq|y|z|pin|q|o)$/i;
+  // PAD nets are usually named PAD, PAD1, PAD_A, ... (i.e. "PAD*"), or
+  // out/output/io/dq/pin with an optional suffix.
+  const PAD_NAME  = /^(pad|out|output|io|dq|pin)\w*$|^(y|z|q|o)$/i;
   const IN_NAME   = /^(in|input|a|d|data|din)$/i;
 
   const SI = { f: 1e-15, p: 1e-12, n: 1e-9, u: 1e-6, "µ": 1e-6, m: 1e-3, k: 1e3, meg: 1e6, g: 1e9, t: 1e12 };

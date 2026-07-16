@@ -220,17 +220,20 @@
   }
 
   // ---- Cadence tab: generate a SKILL/OCEAN extraction script ----
-  function skillScript(lib, cell, view, pin) {
+  // `padPat` may be a plain net name or a wildcard like "PAD*".
+  function skillScript(lib, cell, view, padPat) {
+    // Convert a shell-style wildcard to a SKILL regex anchored at start.
+    const rx = "^" + padPat.replace(/[.^$+?()[\]{}|\\]/g, "\\$&").replace(/\*/g, ".*") + "$";
     return [
       ";; ===================================================================",
       ";; IBIS Model Builder -- extract PAD driver W/L from a Virtuoso cell",
-      ";; Paste into the Virtuoso CIW and press Enter. Run from a shell with",
-      ";; the PDK loaded so the netlister and CDF params are available.",
+      ";; Paste into the Virtuoso CIW and press Enter. Run with the PDK",
+      ";; loaded so the netlister and CDF params are available.",
       ";; ===================================================================",
-      'lib  = "' + lib + '"',
-      'cell = "' + cell + '"',
-      'view = "' + view + '"',
-      'pin  = "' + pin + '"    ; the PAD / I-O net name',
+      'lib    = "' + lib + '"',
+      'cell   = "' + cell + '"',
+      'view   = "' + view + '"',
+      'padRx  = "' + rx + '"    ; PAD net pattern (from "' + padPat + '")',
       "",
       ";; 1) Netlist the cell to SPICE so you can paste it into the",
       ";;    'Paste SPICE netlist' tab (which auto-detects the PAD):",
@@ -238,25 +241,29 @@
       "design( lib cell view )",
       'resultsDir( strcat( "/tmp/" cell "_ibis" ) )',
       "createNetlist( ?recreateAll t ?display nil )",
-      'printf("\\nSPICE netlist written under /tmp/%s_ibis -- open input.scs / netlist and paste it into the web tool.\\n" cell)',
+      'printf("\\nSPICE netlist written under /tmp/%s_ibis -- paste it into the web tool.\\n" cell)',
       "",
-      ";; 2) Print the W/L of every FET whose drain touches the PAD net",
-      ";;    (the push-pull output devices). Param names vary by PDK --",
-      ";;    adjust w/l below if your models use fw/nf/etc.",
+      ";; 2) For every net matching the PAD pattern, print the W/L of each",
+      ";;    FET whose drain (terminal D) touches it -- the push-pull output",
+      ";;    devices. Param names vary by PDK; adjust w/l if yours use fw/nf.",
       'cv = dbOpenCellViewByType( lib cell view "" "r" )',
-      "theNet = car( setof( n cv~>nets  n~>name == pin ) )",
-      "when( theNet",
-      "  foreach( iterm theNet~>instTerms",
-      "    inst  = iterm~>inst",
-      "    mname = inst~>master~>cellName",
-      '    when( rexMatchp( "fet\\\\|mos\\\\|nch\\\\|pch" lower(mname) )',
-      '      w = dbReadCDFParam( inst "w" ) || inst~>w',
-      '      l = dbReadCDFParam( inst "l" ) || inst~>l',
-      '      printf("PAD driver: %-22s model=%-28s W=%L  L=%L\\n" inst~>name mname w l)',
+      "foreach( net cv~>nets",
+      "  when( rexMatchp( padRx net~>name )",
+      '    printf("=== PAD net: %s ===\\n" net~>name)',
+      "    foreach( iterm net~>instTerms",
+      '      when( iterm~>name == "D" || rexMatchp( "D\\\\|DRAIN\\\\|PLUS" upperCase(iterm~>name))',
+      "        inst  = iterm~>inst",
+      "        mname = inst~>master~>cellName",
+      '        when( rexMatchp( \"fet\\\\|mos\\\\|nch\\\\|pch\" lower(mname) )',
+      '          w = dbReadCDFParam( inst \"w\" ) || inst~>w',
+      '          l = dbReadCDFParam( inst \"l\" ) || inst~>l',
+      '          printf(\"  driver %-18s model=%-26s W=%L  L=%L\\n\" inst~>name mname w l)',
+      "        )",
+      "      )",
       "    )",
       "  )",
       ")",
-      'printf("Copy the W and L above into the W/L fields, or paste the netlist into the netlist tab.\\n")'
+      'printf("Copy the pfet/nfet W and L into the W/L fields, or paste the netlist into the netlist tab.\\n")'
     ].join("\n");
   }
 
@@ -266,7 +273,7 @@
         $("cad_lib").value.trim() || "my_lib",
         $("cad_cell").value.trim() || "io_buffer",
         $("cad_view").value.trim() || "schematic",
-        $("cad_pin").value.trim() || "PAD"
+        $("cad_pin").value.trim() || "PAD*"
       );
       $("cad_skill").textContent = s;
       $("cad_skillwrap").hidden = false;
@@ -307,6 +314,43 @@
     m.gndClamp = r.gndClamp;
     m.powerClamp = r.powerClamp;
     m.ramp = r.ramp;
+  }
+
+  // ---- Color-code the .ibs text to match the schematic palette ----
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  // Map a [Section] name to {row, header} css classes; null = neutral keyword.
+  function sectionClass(name) {
+    switch (name) {
+      case "Pulldown":     return { s: "s-pd",   h: "h-pd" };
+      case "Pullup":       return { s: "s-pu",   h: "h-pu" };
+      case "POWER Clamp":  return { s: "s-pwr",  h: "h-pwr" };
+      case "GND Clamp":    return { s: "s-gnd",  h: "h-gnd" };
+      case "Ramp":         return { s: "s-ramp", h: "h-ramp" };
+      case "Package":      return { s: "s-pkg",  h: "h-pkg" };
+      default:             return null;
+    }
+  }
+
+  function highlightIbis(text) {
+    let sec = null;   // current section row-class
+    return text.split("\n").map(function (line) {
+      const t = line.trimStart();
+      let cls = "";
+      const hdr = t.match(/^\[([^\]]+)\]/);
+      if (t.startsWith("|")) {
+        cls = "cmt";                                   // comment lines
+      } else if (hdr) {
+        const sc = sectionClass(hdr[1]);
+        sec = sc ? sc.s : null;                         // set/clear active section
+        cls = sc ? sc.h : "kw";                         // header colored or keyword
+      } else if (/^C_comp\b/.test(t)) {
+        cls = "s-cc";                                   // C_comp line -> cap color
+      } else if (sec) {
+        cls = sec;                                      // data rows inherit section color
+      }
+      return cls ? '<span class="' + cls + '">' + esc(line) + "</span>" : esc(line);
+    }).join("\n");
   }
 
   // ---- Validation rendering ----
@@ -390,7 +434,7 @@
 
       const dateStr = new Date().toISOString().slice(0, 10);
       lastText = window.IBIS.build(d, dateStr);
-      $("output").textContent = lastText;
+      $("output").innerHTML = highlightIbis(lastText);
       $("outCard").hidden = false;
       $("outCard").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {

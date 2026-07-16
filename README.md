@@ -24,14 +24,24 @@ schematic and a mini I‑V plot that update in real time: PMOS pull-up, NMOS pul
 PAD node, `C_comp`, POWER/GND clamp diodes, and package `R/L/C`, each labelled with
 its current value.
 
+The generated `.ibs` text is **color-coded with the same palette as the schematic** —
+`[Pulldown]` matches the NMOS, `[Pullup]` the PMOS, `[POWER Clamp]`/`[GND Clamp]` the
+clamp diodes, `C_comp`/`C_pkg` the caps, `[Package]` the R/L, and `[Ramp]` its own hue —
+so you can trace every table in the file straight back to a component in the drawing.
+
 ### Cadence schematic path
 
 A browser can't read a Virtuoso OA database or a filesystem path directly, so the
-Cadence tab takes your library / cell / view + pin name and generates a
+Cadence tab takes your library / cell / view + **PAD net pattern** and generates a
 **SKILL/OCEAN script** you paste into the Virtuoso CIW. It netlists the cell (which
 you can then drop into the *Paste SPICE netlist* tab) and prints the W/L of every FET
-whose drain touches the PAD net — the push-pull output devices. Paste those numbers
+whose drain touches a PAD net — the push-pull output devices. Paste those numbers
 back to build the model.
+
+PAD nets are usually named `PAD`, `PAD1`, `PAD_A`, … so the pin field accepts a
+**wildcard** — the default `PAD*` matches all of them (netlist auto-detection matches
+the same `PAD*` naming). The same script is committed for standalone use at
+[`tools/extract_pad_wl.il`](tools/extract_pad_wl.il).
 
 ### PAD auto-detection
 
