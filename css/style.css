@@ -173,6 +173,26 @@ pre {
 .ivsvg rect.cd { fill: var(--c-pd); stroke: none; }
 .ivsvg rect.cu { fill: var(--c-pu); stroke: none; }
 
+/* ---- transient step-response plot ---- */
+.trsvg { width: 100%; height: auto; max-width: 720px; }
+.trsvg .ax { stroke: var(--muted); stroke-width: 1; }
+.trsvg text { fill: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+.trsvg .axt { font-size: 10px; text-anchor: middle; }
+.trsvg .leg { font-size: 10px; }
+.trsvg .tr-tick { font-size: 9px; text-anchor: end; }
+.trsvg .tr-guide { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
+.trsvg .curve { fill: none; stroke-width: 2; }
+.trsvg .curve.cu { stroke: var(--c-pu); }
+.trsvg .curve.cd { stroke: var(--c-pd); }
+.trsvg .tr-cross { stroke-width: 1.2; stroke-dasharray: 4 3; }
+.trsvg .tr-cross.cu { stroke: var(--c-pu); }
+.trsvg .tr-cross.cd { stroke: var(--c-pd); }
+.trsvg .tr-mark.cu { fill: var(--c-pu); }
+.trsvg .tr-mark.cd { fill: var(--c-pd); }
+.trsvg .tr-lbl { font-size: 11px; font-weight: 700; }
+.trsvg .tr-lbl.cu { fill: var(--c-pu); }
+.trsvg .tr-lbl.cd { fill: var(--c-pd); }
+
 /* ---- color-coded .ibs output (matches the schematic palette) ---- */
 #output .cmt { color: var(--muted); opacity: 0.65; }
 #output .kw  { color: var(--accent); font-weight: 600; }

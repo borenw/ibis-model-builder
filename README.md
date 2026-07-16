@@ -24,6 +24,15 @@ schematic and a mini I‑V plot that update in real time: PMOS pull-up, NMOS pul
 PAD node, `C_comp`, POWER/GND clamp diodes, and package `R/L/C`, each labelled with
 its current value.
 
+### Transient step response
+
+A live **step-response simulation** drives the output node (C_comp + an external load
+you set) with the model's own nonlinear pull-up / pull-down I‑V tables — integrating
+`dV/dt = I(V)/C_total` — and plots the rising and falling edges. A **1τ crosshair**
+marks each edge: 63.2 % of the swing on the way up, 36.8 % on the way down (the
+exponential-equivalent time constant), labelled `τ↑` and `τ↓` in ns. It's a real
+nonlinear sim of the behavioral model, not an RC approximation.
+
 The generated `.ibs` text is **color-coded with the same palette as the schematic** —
 `[Pulldown]` matches the NMOS, `[Pullup]` the PMOS, `[POWER Clamp]`/`[GND Clamp]` the
 clamp diodes, `C_comp`/`C_pkg` the caps, `[Package]` the R/L, and `[Ramp]` its own hue —
@@ -131,6 +140,7 @@ js/square-law.js        adapter: W/L + process -> model data
 js/risefall.js          adapter: rise/fall @ Cload -> model data
 js/netlist.js           adapter: SPICE netlist -> PAD/W/L -> model data
 js/diagram.js           live schematic + I-V preview (redraws as you type)
+js/transient.js         step-response sim + 1-tau crosshair plot
 js/validate.js          lightweight sanity checks (not ibischk)
 js/app.js               DOM wiring (incl. Cadence SKILL/OCEAN generator)
 build.py                inlines everything -> dist/ibis-model-builder.html

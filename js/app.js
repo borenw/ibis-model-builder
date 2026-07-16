@@ -10,7 +10,7 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.9";
+  const APP_REV = "v2.0";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -566,6 +566,15 @@
     return { pu: "from I-V data", pd: "from I-V data", note: "Assembled from pasted I-V / edge data." };
   }
 
+  function renderTransient(m) {
+    const host = $("transient");
+    if (!host) return;
+    if (!m || !m.model.pullup || !m.model.pullup.length) { window.Transient.render(host, null); return; }
+    const raw = $("tr_cload") ? parseFloat($("tr_cload").value) : NaN;
+    const cl = isFinite(raw) ? Math.max(0, raw) * 1e-12 : 0;
+    window.Transient.render(host, window.Transient.simulate(m.model, cl));
+  }
+
   function updateDiagram() {
     updatePadVals();
     let m = null;
@@ -574,7 +583,8 @@
       dispatchBuild(tmp);
       m = tmp;
     } catch (e) { m = null; }
-    if (!m || !m.model.pullup) { window.Diagram.render(null); return; }
+    if (!m || !m.model.pullup) { window.Diagram.render(null); renderTransient(null); return; }
+    renderTransient(m);
     const mo = m.model;
     const peak = function (a) { return (a || []).reduce(function (x, r) { return Math.max(x, r.typ); }, 0); };
     const L = labelsFor();
