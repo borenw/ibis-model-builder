@@ -32,8 +32,10 @@ so you can trace every table in the file straight back to a component in the dra
 ### Cadence schematic path
 
 A browser can't read a Virtuoso OA database or a filesystem path directly, so the
-Cadence tab takes your library / cell / view + **PAD net pattern** and generates a
-**SKILL/OCEAN script** you paste into the Virtuoso CIW. It netlists the cell (which
+Cadence tab generates a **SKILL/OCEAN script** you paste into the Virtuoso CIW. By
+default it reads the **schematic currently open in Virtuoso** (`geGetEditCellView()`)
+so you don't have to type anything — untick that to enter library / cell / view
+manually instead. Either way you give it a **PAD net pattern**. It netlists the cell (which
 you can then drop into the *Paste SPICE netlist* tab) and prints the W/L of every FET
 whose drain touches a PAD net — the push-pull output devices. Paste those numbers
 back to build the model.
@@ -111,6 +113,12 @@ dropdown by family:
 
 Enter device geometry as **separate width (W) and length (L)** boxes in µm — the tool
 computes W/L for you. Add your own node by dropping a new entry in the file.
+
+Each node also carries an estimated **standard pad-ring capacitance** (bond pad + ESD),
+which usually dominates `C_comp`. It's folded into the auto `C_comp` estimate, shown
+next to the override field, and there's a one-click button to fill the override with
+the full estimate (device + pad ring). Bigger/older pads and higher-voltage (bigger
+ESD) flavors get larger values.
 
 ## Project layout
 

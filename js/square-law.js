@@ -97,10 +97,11 @@
         return diode(vout - vcc);  // anode=pin, cathode=Vcc
       });
 
-      // C_comp estimate: gate + junction area cap of both devices + pad.
-      // Assume L = 1 (ratios given as W/L) with a nominal Lmin so area
-      // scales with the ratio; add a fixed pad/ESD cap.
-      const padC = 0.5e-12;
+      // C_comp estimate: standard pad-ring cap (bond pad + ESD, process-
+      // specific) + the gate/junction area cap of the two output devices.
+      // The pad ring usually dominates. opts.cpad is the process pad-ring
+      // estimate (F); falls back to 0.5 pF if not supplied.
+      const padC = opts.cpad || 0.5e-12;
       const areaCap = (p.cox * 1e-15) * (wlN + wlP) * 0.15 * 0.15; // very rough, um^2
       const ccomp = opts.ccomp || (padC + areaCap);
 

@@ -97,6 +97,7 @@
         <label>C_comp override (pF, blank = estimate)<input id="wlCcomp" type="number" step="0.1" placeholder="auto"></label>
       </div>
       <p class="note" id="nodeNote"></p>
+      <p class="note pad-help">Standard pad-ring cap for this process ≈ <b id="wlPadVal">–</b> pF (bond pad + ESD; included in the auto C_comp). <button type="button" class="mini" id="wlCcFill">fill C_comp override with estimate</button></p>
       <details>
         <summary>Edit process parameters (square-law)</summary>
         <div class="grid">
@@ -161,19 +162,28 @@
           <label>Pullup PMOS L (µm)<input id="net_lP" type="number" step="0.01"></label>
           <label>C_comp override (pF, blank = estimate)<input id="net_ccomp" type="number" step="0.1" placeholder="auto"></label>
         </div>
+        <p class="note pad-help">Standard pad-ring cap ≈ <b id="netPadVal">–</b> pF (included in auto C_comp). <button type="button" class="mini" id="netCcFill">fill C_comp override with estimate</button></p>
         <p class="note" id="net_devinfo"></p>
       </div>
     </div>
 
     <!-- Cadence -->
     <div class="panel" id="panel-cad">
-      <div class="vmsg warn" style="margin-bottom:0.8rem">⚠ A browser can't read a Cadence OA database or a filesystem path directly. Enter your cell + pin below and this generates a <strong>Virtuoso SKILL/OCEAN script</strong> that netlists the cell and prints the pin's driver W/L. Run it in the CIW, then paste the numbers (or the netlist) back here.</div>
-      <label class="full">Schematic OA path <span class="desc">(optional — path to the library dir, e.g. <code>/proj/pdk/my_lib</code>; used to register the lib so lib/cell/view resolves)</span>
-        <input id="cad_path" placeholder="/path/to/oa/library  (leave blank if the lib is already in cds.lib)"></label>
+      <div class="vmsg warn" style="margin-bottom:0.8rem">⚠ A browser can't read a Cadence OA database or a filesystem path directly. This generates a <strong>Virtuoso SKILL/OCEAN script</strong> that reads your schematic and prints the pin's driver W/L. Run it in the CIW, then paste the numbers (or the netlist) back here.</div>
+      <label class="full" style="flex-direction:row; align-items:center; gap:0.5rem">
+        <input type="checkbox" id="cad_useopen" checked style="width:auto">
+        Read the schematic <strong>currently open in Virtuoso</strong> (no lib/cell/view needed — uses <code>geGetEditCellView()</code>)
+      </label>
+      <div id="cad_manual">
+        <label class="full">Schematic OA path <span class="desc">(optional — path to the library dir, e.g. <code>/proj/pdk/my_lib</code>; registers the lib so lib/cell/view resolves)</span>
+          <input id="cad_path" placeholder="/path/to/oa/library  (leave blank if the lib is already in cds.lib)"></label>
+        <div class="grid">
+          <label>Library<input id="cad_lib" value="my_lib"></label>
+          <label>Cell<input id="cad_cell" value="io_buffer"></label>
+          <label>View<input id="cad_view" value="schematic"></label>
+        </div>
+      </div>
       <div class="grid">
-        <label>Library<input id="cad_lib" value="my_lib"></label>
-        <label>Cell<input id="cad_cell" value="io_buffer"></label>
-        <label>View<input id="cad_view" value="schematic"></label>
         <label>PAD net name / pattern (<code>*</code> = wildcard)<input id="cad_pin" value="PAD*"></label>
       </div>
       <button id="genSkill" class="secondary">📜 Generate Virtuoso SKILL/OCEAN script</button>
@@ -190,6 +200,7 @@
         <label>Pullup PMOS L (µm)<input id="cad_lP" type="number" step="0.01" placeholder="from script"></label>
         <label>C_comp override (pF, blank = estimate)<input id="cad_ccomp" type="number" step="0.1" placeholder="auto"></label>
       </div>
+      <p class="note pad-help">Standard pad-ring cap ≈ <b id="cadPadVal">–</b> pF (included in auto C_comp). <button type="button" class="mini" id="cadCcFill">fill C_comp override with estimate</button></p>
     </div>
 
     <button id="generate" class="primary">Generate IBIS model &rarr;</button>

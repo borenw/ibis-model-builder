@@ -15,7 +15,8 @@
 ;; Usage: edit the four vars below, then load/paste this file in the CIW.
 ;; ======================================================================
 
-lib    = "my_lib"
+useOpen = t               ; t = read the schematic in the CURRENT window
+lib    = "my_lib"         ; (used only when useOpen = nil)
 cell   = "io_buffer"
 view   = "schematic"
 padPat = "PAD*"            ; shell-style wildcard; * matches any suffix
@@ -24,12 +25,17 @@ oaPath = ""               ; optional: path to the OA library dir (else "")
 ;; --- convert the wildcard to an anchored SKILL regex --------------------
 padRx = strcat( "^" (rexReplace( rexReplace( padPat "\\*" ".*" 0 ) "\\." "\\." 0 )) "$" )
 
-;; --- 0) register the library at its OA path if given -------------------
-when( and( oaPath nequal( oaPath "" ) )
-  unless( ddGetObj( lib )
-    ddCreateLib( lib oaPath )
-    printf("Registered library %s at %s\n" lib oaPath)
+;; --- 0) pick the cellview: current window, or lib/cell/view -----------
+if( useOpen then
+  cv = geGetEditCellView()
+  unless( cv error("No cellview in the current window. Open your schematic and retry.") )
+  lib = cv~>libName  cell = cv~>cellName  view = cv~>viewName
+  printf("Using open cellview: %s / %s / %s\n" lib cell view)
+else
+  when( and( oaPath nequal( oaPath "" ) )
+    unless( ddGetObj( lib ) ddCreateLib( lib oaPath ) )
   )
+  cv = dbOpenCellViewByType( lib cell view "" "r" )
 )
 
 ;; --- 1) netlist the cell to SPICE --------------------------------------
@@ -53,7 +59,7 @@ procedure( getP( cdf names )
   )
 )
 
-cv = dbOpenCellViewByType( lib cell view "" "r" )
+;; (cv was opened in step 0 above)
 matched = 0  seen = nil
 foreach( net cv~>nets
   when( rexMatchp( padRx net~>name )

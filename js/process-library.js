@@ -192,3 +192,24 @@ window.PROCESS_LIBRARY = {
     note: "User-defined parameters."
   }
 };
+
+/*
+ * Estimated STANDARD PAD-RING capacitance per entry (bond pad + ESD clamps),
+ * in farads. This usually dominates C_comp for an I/O pin. Rough typicals:
+ * bigger/older pads and higher-voltage flavors (larger ESD devices) => larger.
+ * Anchor: a sky130 GPIO pad is ~1 pF. Estimates only -- override in the UI.
+ */
+(function (L) {
+  const cpad = {
+    sky130:     1.0e-12,
+    tsmc180_lv: 1.0e-12, tsmc180_mv: 1.3e-12, tsmc180_hv: 1.6e-12,
+    tsmc130_lv: 0.8e-12, tsmc130_mv: 1.0e-12, tsmc130_hv: 1.2e-12,
+    tsmc65_lv:  0.6e-12, tsmc65_mv:  0.8e-12, tsmc65_hv:  1.0e-12,
+    tsmc40_lv:  0.5e-12, tsmc40_mv:  0.7e-12, tsmc40_hv:  0.9e-12,
+    tsmc28_lv:  0.5e-12, tsmc28_mv:  0.7e-12, tsmc28_hv:  0.9e-12,
+    tsmc16_lv:  0.5e-12, tsmc16_io:  0.7e-12,
+    n180:       1.0e-12, n90:        0.7e-12, n45:        0.6e-12,
+    custom:     0.5e-12
+  };
+  for (const k in L) L[k].cpad = cpad[k] || 0.7e-12;
+})(window.PROCESS_LIBRARY);

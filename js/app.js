@@ -10,7 +10,7 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.7";
+  const APP_REV = "v1.8";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -126,6 +126,43 @@
   }
   function fmtRatio(x) { return isFinite(x) ? (x >= 100 ? x.toFixed(0) : x.toFixed(2)) : "?"; }
 
+  // ---- Standard pad-ring cap (bond pad + ESD) per process ----
+  function cpadOf(sel) { const e = sel && window.PROCESS_LIBRARY[sel.value]; return e ? e.cpad : 0.5e-12; }
+  function updatePadVals() {
+    if ($("wlPadVal")) $("wlPadVal").textContent = (cpadOf(nodeSel) * 1e12).toFixed(2);
+    if ($("netPadVal")) $("netPadVal").textContent = (cpadOf(netNodeSel) * 1e12).toFixed(2);
+    if ($("cadPadVal")) $("cadPadVal").textContent = (cpadOf(cadNodeSel) * 1e12).toFixed(2);
+  }
+
+  // Fill a C_comp override with the auto estimate (device cap + pad ring).
+  function fillCcomp(tab) {
+    let params, wlN, wlP, cpad, target;
+    if (tab === "wl") {
+      params = { vdd: num("p_vdd"), vthn: num("p_vthn"), vthp: num("p_vthp"),
+        kpn: num("p_kpn"), kpp: num("p_kpp"), lambdan: num("p_ln"), lambdap: num("p_lp"), cox: num("p_cox") };
+      wlN = ratio("wN", "lN"); wlP = ratio("wP", "lP"); cpad = cpadOf(nodeSel); target = "wlCcomp";
+    } else if (tab === "net") {
+      const b = window.PROCESS_LIBRARY[netNodeSel.value];
+      params = b; wlN = ratio("net_wN", "net_lN"); wlP = ratio("net_wP", "net_lP"); cpad = b.cpad; target = "net_ccomp";
+    } else {
+      const b = window.PROCESS_LIBRARY[cadNodeSel.value];
+      params = b; wlN = ratio("cad_wN", "cad_lN"); wlP = ratio("cad_wP", "cad_lP"); cpad = b.cpad; target = "cad_ccomp";
+    }
+    if (!(wlN > 0) || !(wlP > 0)) { alert("Enter W and L for both devices first."); return; }
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, cpad: cpad, ccomp: null });
+    $(target).value = +(r.ccomp.typ * 1e12).toFixed(3);
+    updateDiagram();
+  }
+  if ($("wlCcFill")) $("wlCcFill").addEventListener("click", function () { fillCcomp("wl"); });
+  if ($("netCcFill")) $("netCcFill").addEventListener("click", function () { fillCcomp("net"); });
+  if ($("cadCcFill")) $("cadCcFill").addEventListener("click", function () { fillCcomp("cad"); });
+
+  // Cadence "use open schematic window" toggle hides the lib/cell/view fields.
+  if ($("cad_useopen")) {
+    const tog = function () { $("cad_manual").style.display = $("cad_useopen").checked ? "none" : ""; };
+    $("cad_useopen").addEventListener("change", tog); tog();
+  }
+
   function buildFromWL(d) {
     const params = {
       vdd: num("p_vdd"), vthn: num("p_vthn"), vthp: num("p_vthp"),
@@ -135,7 +172,8 @@
     const wlN = ratio("wN", "lN"), wlP = ratio("wP", "lP");
     if (!(wlN > 0) || !(wlP > 0)) throw new Error("Enter positive W and L for both devices.");
     const ccompOv = $("wlCcomp").value ? num("wlCcomp") * 1e-12 : null;
-    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv,
+      cpad: window.PROCESS_LIBRARY[nodeSel.value].cpad });
     applyElectrical(d, params.vdd, r);
     d.provenance = "Square-law estimate. node=" + nodeSel.value +
       ", NMOS " + $("wN").value + "/" + $("lN").value + "um (W/L=" + fmtRatio(wlN) + ")" +
@@ -237,7 +275,7 @@
     const wlN = ratio("net_wN", "net_lN"), wlP = ratio("net_wP", "net_lP");
     if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W and L manually.");
     const ccompOv = $("net_ccomp").value ? parseFloat($("net_ccomp").value) * 1e-12 : null;
-    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv, cpad: base.cpad });
     applyElectrical(d, params.vdd, r);
     d.provenance = "Parsed from SPICE netlist. PAD=" + $("net_pad").value +
       ", VDD=" + $("net_vdd").value + ", GND=" + $("net_gnd").value +
@@ -246,29 +284,32 @@
 
   // ---- Cadence tab: generate a SKILL/OCEAN extraction script ----
   // `padPat` may be a plain net name or a wildcard like "PAD*".
-  function skillScript(lib, cell, view, padPat, oaPath) {
+  function skillScript(lib, cell, view, padPat, oaPath, useOpen) {
     // Convert a shell-style wildcard to a SKILL regex anchored at start.
     const rx = "^" + padPat.replace(/[.^$+?()[\]{}|\\]/g, "\\$&").replace(/\*/g, ".*") + "$";
     const head = [
       ";; ===================================================================",
       ";; IBIS Model Builder -- extract PAD driver W/L from a Virtuoso cell",
-      ";; Paste into the Virtuoso CIW and press Enter. Run with the PDK",
-      ";; loaded so the netlister and CDF params are available.",
-      ";; ===================================================================",
-      'lib    = "' + lib + '"',
-      'cell   = "' + cell + '"',
-      'view   = "' + view + '"',
-      'padRx  = "' + rx + '"    ; PAD net pattern (from "' + padPat + '")'
+      ";; Paste into the Virtuoso CIW and press Enter. Run with the PDK loaded.",
+      ";; ==================================================================="
     ];
-    if (oaPath) {
-      head.push("");
-      head.push(";; 0) Register the library at its OA path so lib/cell/view resolves");
-      head.push(";;    (skip if the lib is already defined in your cds.lib):");
-      head.push('unless( ddGetObj( lib )');
-      head.push('  ddCreateLib( lib "' + oaPath + '" )');
-      head.push('  printf("Registered library %s at %s\\n" lib "' + oaPath + '")');
-      head.push(')');
+    if (useOpen) {
+      head.push(";; Read the schematic in the CURRENT window -- no lib/cell/view needed.");
+      head.push("cv = geGetEditCellView()");
+      head.push('unless( cv error("No cellview in the current window. Open your schematic and retry.") )');
+      head.push("lib = cv~>libName   cell = cv~>cellName   view = cv~>viewName");
+      head.push('printf("Using open cellview: %s / %s / %s\\n" lib cell view)');
+    } else {
+      head.push('lib  = "' + lib + '"');
+      head.push('cell = "' + cell + '"');
+      head.push('view = "' + view + '"');
+      if (oaPath) {
+        head.push(";; register the library at its OA path (skip if already in cds.lib):");
+        head.push('unless( ddGetObj( lib )  ddCreateLib( lib "' + oaPath + '" ) )');
+      }
+      head.push('cv = dbOpenCellViewByType( lib cell view "" "r" )');
     }
+    head.push('padRx = "' + rx + '"    ; PAD net pattern (from "' + padPat + '")');
     return head.concat([
       "",
       ";; 1) Netlist the cell to SPICE so you can paste it into the",
@@ -291,7 +332,6 @@
       "    val",
       "  )",
       ")",
-      'cv = dbOpenCellViewByType( lib cell view "" "r" )',
       "matched = 0  seen = nil",
       "foreach( net cv~>nets",
       "  when( rexMatchp( padRx net~>name )",
@@ -326,7 +366,8 @@
         $("cad_cell").value.trim() || "io_buffer",
         $("cad_view").value.trim() || "schematic",
         $("cad_pin").value.trim() || "PAD*",
-        $("cad_path").value.trim()
+        $("cad_path").value.trim(),
+        $("cad_useopen").checked
       );
       $("cad_skill").textContent = s;
       $("cad_skillwrap").hidden = false;
@@ -349,11 +390,13 @@
     if (!(wlN > 0) || !(wlP > 0))
       throw new Error("Enter the NMOS/PMOS W and L from the SKILL script output first.");
     const ccompOv = $("cad_ccomp").value ? parseFloat($("cad_ccomp").value) * 1e-12 : null;
-    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv, cpad: base.cpad });
     applyElectrical(d, params.vdd, r);
     const oaPath = $("cad_path").value.trim();
-    d.provenance = "From Cadence cell " + $("cad_lib").value + "/" + $("cad_cell").value +
-      " pin " + $("cad_pin").value + (oaPath ? " (" + oaPath + ")" : "") +
+    const src = $("cad_useopen").checked ? "current schematic window" :
+      $("cad_lib").value + "/" + $("cad_cell").value + (oaPath ? " (" + oaPath + ")" : "");
+    d.provenance = "From Cadence cell " + src +
+      " pin " + $("cad_pin").value +
       "; square-law on node=" + $("cad_node").value +
       ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
   }
@@ -451,6 +494,7 @@
   }
 
   function updateDiagram() {
+    updatePadVals();
     let m = null;
     try {
       const tmp = baseModel();

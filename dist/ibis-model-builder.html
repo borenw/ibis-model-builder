@@ -92,6 +92,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 details { margin-top: 0.9rem; }
 summary { cursor: pointer; color: var(--accent); font-size: 0.85rem; margin-bottom: 0.6rem; }
 .note { color: var(--muted); font-size: 0.82rem; font-style: italic; margin: 0.6rem 0 0; }
+.pad-help { font-style: normal; }
+.pad-help b { color: var(--c-cc); font-style: normal; }
+button.mini {
+  background: var(--card2); color: var(--accent); border: 1px solid var(--line);
+  border-radius: 6px; padding: 0.15rem 0.5rem; font-size: 0.76rem; cursor: pointer;
+  margin-left: 0.3rem; font-style: normal;
+}
+button.mini:hover { border-color: var(--accent); }
 
 .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .tab {
@@ -293,6 +301,7 @@ footer a { color: var(--accent); }
         <label>C_comp override (pF, blank = estimate)<input id="wlCcomp" type="number" step="0.1" placeholder="auto"></label>
       </div>
       <p class="note" id="nodeNote"></p>
+      <p class="note pad-help">Standard pad-ring cap for this process ≈ <b id="wlPadVal">–</b> pF (bond pad + ESD; included in the auto C_comp). <button type="button" class="mini" id="wlCcFill">fill C_comp override with estimate</button></p>
       <details>
         <summary>Edit process parameters (square-law)</summary>
         <div class="grid">
@@ -357,19 +366,28 @@ footer a { color: var(--accent); }
           <label>Pullup PMOS L (µm)<input id="net_lP" type="number" step="0.01"></label>
           <label>C_comp override (pF, blank = estimate)<input id="net_ccomp" type="number" step="0.1" placeholder="auto"></label>
         </div>
+        <p class="note pad-help">Standard pad-ring cap ≈ <b id="netPadVal">–</b> pF (included in auto C_comp). <button type="button" class="mini" id="netCcFill">fill C_comp override with estimate</button></p>
         <p class="note" id="net_devinfo"></p>
       </div>
     </div>
 
     <!-- Cadence -->
     <div class="panel" id="panel-cad">
-      <div class="vmsg warn" style="margin-bottom:0.8rem">⚠ A browser can't read a Cadence OA database or a filesystem path directly. Enter your cell + pin below and this generates a <strong>Virtuoso SKILL/OCEAN script</strong> that netlists the cell and prints the pin's driver W/L. Run it in the CIW, then paste the numbers (or the netlist) back here.</div>
-      <label class="full">Schematic OA path <span class="desc">(optional — path to the library dir, e.g. <code>/proj/pdk/my_lib</code>; used to register the lib so lib/cell/view resolves)</span>
-        <input id="cad_path" placeholder="/path/to/oa/library  (leave blank if the lib is already in cds.lib)"></label>
+      <div class="vmsg warn" style="margin-bottom:0.8rem">⚠ A browser can't read a Cadence OA database or a filesystem path directly. This generates a <strong>Virtuoso SKILL/OCEAN script</strong> that reads your schematic and prints the pin's driver W/L. Run it in the CIW, then paste the numbers (or the netlist) back here.</div>
+      <label class="full" style="flex-direction:row; align-items:center; gap:0.5rem">
+        <input type="checkbox" id="cad_useopen" checked style="width:auto">
+        Read the schematic <strong>currently open in Virtuoso</strong> (no lib/cell/view needed — uses <code>geGetEditCellView()</code>)
+      </label>
+      <div id="cad_manual">
+        <label class="full">Schematic OA path <span class="desc">(optional — path to the library dir, e.g. <code>/proj/pdk/my_lib</code>; registers the lib so lib/cell/view resolves)</span>
+          <input id="cad_path" placeholder="/path/to/oa/library  (leave blank if the lib is already in cds.lib)"></label>
+        <div class="grid">
+          <label>Library<input id="cad_lib" value="my_lib"></label>
+          <label>Cell<input id="cad_cell" value="io_buffer"></label>
+          <label>View<input id="cad_view" value="schematic"></label>
+        </div>
+      </div>
       <div class="grid">
-        <label>Library<input id="cad_lib" value="my_lib"></label>
-        <label>Cell<input id="cad_cell" value="io_buffer"></label>
-        <label>View<input id="cad_view" value="schematic"></label>
         <label>PAD net name / pattern (<code>*</code> = wildcard)<input id="cad_pin" value="PAD*"></label>
       </div>
       <button id="genSkill" class="secondary">📜 Generate Virtuoso SKILL/OCEAN script</button>
@@ -386,6 +404,7 @@ footer a { color: var(--accent); }
         <label>Pullup PMOS L (µm)<input id="cad_lP" type="number" step="0.01" placeholder="from script"></label>
         <label>C_comp override (pF, blank = estimate)<input id="cad_ccomp" type="number" step="0.1" placeholder="auto"></label>
       </div>
+      <p class="note pad-help">Standard pad-ring cap ≈ <b id="cadPadVal">–</b> pF (included in auto C_comp). <button type="button" class="mini" id="cadCcFill">fill C_comp override with estimate</button></p>
     </div>
 
     <button id="generate" class="primary">Generate IBIS model &rarr;</button>
@@ -617,6 +636,27 @@ window.PROCESS_LIBRARY = {
     note: "User-defined parameters."
   }
 };
+
+/*
+ * Estimated STANDARD PAD-RING capacitance per entry (bond pad + ESD clamps),
+ * in farads. This usually dominates C_comp for an I/O pin. Rough typicals:
+ * bigger/older pads and higher-voltage flavors (larger ESD devices) => larger.
+ * Anchor: a sky130 GPIO pad is ~1 pF. Estimates only -- override in the UI.
+ */
+(function (L) {
+  const cpad = {
+    sky130:     1.0e-12,
+    tsmc180_lv: 1.0e-12, tsmc180_mv: 1.3e-12, tsmc180_hv: 1.6e-12,
+    tsmc130_lv: 0.8e-12, tsmc130_mv: 1.0e-12, tsmc130_hv: 1.2e-12,
+    tsmc65_lv:  0.6e-12, tsmc65_mv:  0.8e-12, tsmc65_hv:  1.0e-12,
+    tsmc40_lv:  0.5e-12, tsmc40_mv:  0.7e-12, tsmc40_hv:  0.9e-12,
+    tsmc28_lv:  0.5e-12, tsmc28_mv:  0.7e-12, tsmc28_hv:  0.9e-12,
+    tsmc16_lv:  0.5e-12, tsmc16_io:  0.7e-12,
+    n180:       1.0e-12, n90:        0.7e-12, n45:        0.6e-12,
+    custom:     0.5e-12
+  };
+  for (const k in L) L[k].cpad = cpad[k] || 0.7e-12;
+})(window.PROCESS_LIBRARY);
 
 </script>
 <script>
@@ -884,10 +924,11 @@ window.PROCESS_LIBRARY = {
         return diode(vout - vcc);  // anode=pin, cathode=Vcc
       });
 
-      // C_comp estimate: gate + junction area cap of both devices + pad.
-      // Assume L = 1 (ratios given as W/L) with a nominal Lmin so area
-      // scales with the ratio; add a fixed pad/ESD cap.
-      const padC = 0.5e-12;
+      // C_comp estimate: standard pad-ring cap (bond pad + ESD, process-
+      // specific) + the gate/junction area cap of the two output devices.
+      // The pad ring usually dominates. opts.cpad is the process pad-ring
+      // estimate (F); falls back to 0.5 pF if not supplied.
+      const padC = opts.cpad || 0.5e-12;
       const areaCap = (p.cox * 1e-15) * (wlN + wlP) * 0.15 * 0.15; // very rough, um^2
       const ccomp = opts.ccomp || (padC + areaCap);
 
@@ -1478,7 +1519,7 @@ window.PROCESS_LIBRARY = {
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v1.7";
+  const APP_REV = "v1.8";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -1594,6 +1635,43 @@ window.PROCESS_LIBRARY = {
   }
   function fmtRatio(x) { return isFinite(x) ? (x >= 100 ? x.toFixed(0) : x.toFixed(2)) : "?"; }
 
+  // ---- Standard pad-ring cap (bond pad + ESD) per process ----
+  function cpadOf(sel) { const e = sel && window.PROCESS_LIBRARY[sel.value]; return e ? e.cpad : 0.5e-12; }
+  function updatePadVals() {
+    if ($("wlPadVal")) $("wlPadVal").textContent = (cpadOf(nodeSel) * 1e12).toFixed(2);
+    if ($("netPadVal")) $("netPadVal").textContent = (cpadOf(netNodeSel) * 1e12).toFixed(2);
+    if ($("cadPadVal")) $("cadPadVal").textContent = (cpadOf(cadNodeSel) * 1e12).toFixed(2);
+  }
+
+  // Fill a C_comp override with the auto estimate (device cap + pad ring).
+  function fillCcomp(tab) {
+    let params, wlN, wlP, cpad, target;
+    if (tab === "wl") {
+      params = { vdd: num("p_vdd"), vthn: num("p_vthn"), vthp: num("p_vthp"),
+        kpn: num("p_kpn"), kpp: num("p_kpp"), lambdan: num("p_ln"), lambdap: num("p_lp"), cox: num("p_cox") };
+      wlN = ratio("wN", "lN"); wlP = ratio("wP", "lP"); cpad = cpadOf(nodeSel); target = "wlCcomp";
+    } else if (tab === "net") {
+      const b = window.PROCESS_LIBRARY[netNodeSel.value];
+      params = b; wlN = ratio("net_wN", "net_lN"); wlP = ratio("net_wP", "net_lP"); cpad = b.cpad; target = "net_ccomp";
+    } else {
+      const b = window.PROCESS_LIBRARY[cadNodeSel.value];
+      params = b; wlN = ratio("cad_wN", "cad_lN"); wlP = ratio("cad_wP", "cad_lP"); cpad = b.cpad; target = "cad_ccomp";
+    }
+    if (!(wlN > 0) || !(wlP > 0)) { alert("Enter W and L for both devices first."); return; }
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, cpad: cpad, ccomp: null });
+    $(target).value = +(r.ccomp.typ * 1e12).toFixed(3);
+    updateDiagram();
+  }
+  if ($("wlCcFill")) $("wlCcFill").addEventListener("click", function () { fillCcomp("wl"); });
+  if ($("netCcFill")) $("netCcFill").addEventListener("click", function () { fillCcomp("net"); });
+  if ($("cadCcFill")) $("cadCcFill").addEventListener("click", function () { fillCcomp("cad"); });
+
+  // Cadence "use open schematic window" toggle hides the lib/cell/view fields.
+  if ($("cad_useopen")) {
+    const tog = function () { $("cad_manual").style.display = $("cad_useopen").checked ? "none" : ""; };
+    $("cad_useopen").addEventListener("change", tog); tog();
+  }
+
   function buildFromWL(d) {
     const params = {
       vdd: num("p_vdd"), vthn: num("p_vthn"), vthp: num("p_vthp"),
@@ -1603,7 +1681,8 @@ window.PROCESS_LIBRARY = {
     const wlN = ratio("wN", "lN"), wlP = ratio("wP", "lP");
     if (!(wlN > 0) || !(wlP > 0)) throw new Error("Enter positive W and L for both devices.");
     const ccompOv = $("wlCcomp").value ? num("wlCcomp") * 1e-12 : null;
-    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv,
+      cpad: window.PROCESS_LIBRARY[nodeSel.value].cpad });
     applyElectrical(d, params.vdd, r);
     d.provenance = "Square-law estimate. node=" + nodeSel.value +
       ", NMOS " + $("wN").value + "/" + $("lN").value + "um (W/L=" + fmtRatio(wlN) + ")" +
@@ -1705,7 +1784,7 @@ window.PROCESS_LIBRARY = {
     const wlN = ratio("net_wN", "net_lN"), wlP = ratio("net_wP", "net_lP");
     if (!(wlN > 0) || !(wlP > 0)) throw new Error("Could not determine output W/L — set NMOS/PMOS W and L manually.");
     const ccompOv = $("net_ccomp").value ? parseFloat($("net_ccomp").value) * 1e-12 : null;
-    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv, cpad: base.cpad });
     applyElectrical(d, params.vdd, r);
     d.provenance = "Parsed from SPICE netlist. PAD=" + $("net_pad").value +
       ", VDD=" + $("net_vdd").value + ", GND=" + $("net_gnd").value +
@@ -1714,29 +1793,32 @@ window.PROCESS_LIBRARY = {
 
   // ---- Cadence tab: generate a SKILL/OCEAN extraction script ----
   // `padPat` may be a plain net name or a wildcard like "PAD*".
-  function skillScript(lib, cell, view, padPat, oaPath) {
+  function skillScript(lib, cell, view, padPat, oaPath, useOpen) {
     // Convert a shell-style wildcard to a SKILL regex anchored at start.
     const rx = "^" + padPat.replace(/[.^$+?()[\]{}|\\]/g, "\\$&").replace(/\*/g, ".*") + "$";
     const head = [
       ";; ===================================================================",
       ";; IBIS Model Builder -- extract PAD driver W/L from a Virtuoso cell",
-      ";; Paste into the Virtuoso CIW and press Enter. Run with the PDK",
-      ";; loaded so the netlister and CDF params are available.",
-      ";; ===================================================================",
-      'lib    = "' + lib + '"',
-      'cell   = "' + cell + '"',
-      'view   = "' + view + '"',
-      'padRx  = "' + rx + '"    ; PAD net pattern (from "' + padPat + '")'
+      ";; Paste into the Virtuoso CIW and press Enter. Run with the PDK loaded.",
+      ";; ==================================================================="
     ];
-    if (oaPath) {
-      head.push("");
-      head.push(";; 0) Register the library at its OA path so lib/cell/view resolves");
-      head.push(";;    (skip if the lib is already defined in your cds.lib):");
-      head.push('unless( ddGetObj( lib )');
-      head.push('  ddCreateLib( lib "' + oaPath + '" )');
-      head.push('  printf("Registered library %s at %s\\n" lib "' + oaPath + '")');
-      head.push(')');
+    if (useOpen) {
+      head.push(";; Read the schematic in the CURRENT window -- no lib/cell/view needed.");
+      head.push("cv = geGetEditCellView()");
+      head.push('unless( cv error("No cellview in the current window. Open your schematic and retry.") )');
+      head.push("lib = cv~>libName   cell = cv~>cellName   view = cv~>viewName");
+      head.push('printf("Using open cellview: %s / %s / %s\\n" lib cell view)');
+    } else {
+      head.push('lib  = "' + lib + '"');
+      head.push('cell = "' + cell + '"');
+      head.push('view = "' + view + '"');
+      if (oaPath) {
+        head.push(";; register the library at its OA path (skip if already in cds.lib):");
+        head.push('unless( ddGetObj( lib )  ddCreateLib( lib "' + oaPath + '" ) )');
+      }
+      head.push('cv = dbOpenCellViewByType( lib cell view "" "r" )');
     }
+    head.push('padRx = "' + rx + '"    ; PAD net pattern (from "' + padPat + '")');
     return head.concat([
       "",
       ";; 1) Netlist the cell to SPICE so you can paste it into the",
@@ -1759,7 +1841,6 @@ window.PROCESS_LIBRARY = {
       "    val",
       "  )",
       ")",
-      'cv = dbOpenCellViewByType( lib cell view "" "r" )',
       "matched = 0  seen = nil",
       "foreach( net cv~>nets",
       "  when( rexMatchp( padRx net~>name )",
@@ -1794,7 +1875,8 @@ window.PROCESS_LIBRARY = {
         $("cad_cell").value.trim() || "io_buffer",
         $("cad_view").value.trim() || "schematic",
         $("cad_pin").value.trim() || "PAD*",
-        $("cad_path").value.trim()
+        $("cad_path").value.trim(),
+        $("cad_useopen").checked
       );
       $("cad_skill").textContent = s;
       $("cad_skillwrap").hidden = false;
@@ -1817,11 +1899,13 @@ window.PROCESS_LIBRARY = {
     if (!(wlN > 0) || !(wlP > 0))
       throw new Error("Enter the NMOS/PMOS W and L from the SKILL script output first.");
     const ccompOv = $("cad_ccomp").value ? parseFloat($("cad_ccomp").value) * 1e-12 : null;
-    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv });
+    const r = window.SquareLaw.generate({ params: params, wlN: wlN, wlP: wlP, ccomp: ccompOv, cpad: base.cpad });
     applyElectrical(d, params.vdd, r);
     const oaPath = $("cad_path").value.trim();
-    d.provenance = "From Cadence cell " + $("cad_lib").value + "/" + $("cad_cell").value +
-      " pin " + $("cad_pin").value + (oaPath ? " (" + oaPath + ")" : "") +
+    const src = $("cad_useopen").checked ? "current schematic window" :
+      $("cad_lib").value + "/" + $("cad_cell").value + (oaPath ? " (" + oaPath + ")" : "");
+    d.provenance = "From Cadence cell " + src +
+      " pin " + $("cad_pin").value +
       "; square-law on node=" + $("cad_node").value +
       ", W/L(n)=" + wlN + ", W/L(p)=" + wlP + ".";
   }
@@ -1919,6 +2003,7 @@ window.PROCESS_LIBRARY = {
   }
 
   function updateDiagram() {
+    updatePadVals();
     let m = null;
     try {
       const tmp = baseModel();
