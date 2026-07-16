@@ -10,7 +10,7 @@
   const num = function (id) { return parseFloat($(id).value); };
 
   // App revision — shown top-right and stamped into the .ibs [Source] line.
-  const APP_REV = "v2.0";
+  const APP_REV = "v2.1";
   if ($("rev")) $("rev").textContent = "rev " + APP_REV;
 
   let activeTab = "wl";
@@ -345,9 +345,10 @@
       "        w = getP( cdf '(\"w\" \"fw\" \"wf\" \"wtot\" \"totalw\" \"W\") )",
       "        l = getP( cdf '(\"l\" \"lr\" \"L\") )",
       "        gt = car( setof( it inst~>instTerms rexMatchp( \"^G\" upperCase( it~>name ) ) ) )",
-      "        gnet = and( gt gt~>net gt~>net~>name )",
-      '        printf("  %-14s master=%-18s gate=%-10s W=%A  L=%A\\n"',
-      "               inst~>name inst~>master~>cellName gnet w l)",
+      "        gnet = or( and( gt gt~>net gt~>net~>name ) \"?\" )   ; never nil (%s needs a string)",
+      "        nm = or( inst~>name \"?\" )",
+      "        mn = or( and( inst~>master inst~>master~>cellName ) \"?\" )",
+      '        printf("  %-14s master=%-18s gate=%-10s W=%A  L=%A\\n" nm mn gnet w l)',
       "      )",
       "    )",
       "  )",

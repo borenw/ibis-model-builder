@@ -73,9 +73,10 @@ foreach( net cv~>nets
         w = getP( cdf '("w" "fw" "wf" "wtot" "totalw" "W") )
         l = getP( cdf '("l" "lr" "L") )
         gt = car( setof( it inst~>instTerms rexMatchp( "^G" upperCase( it~>name ) ) ) )
-        gnet = and( gt gt~>net gt~>net~>name )
-        printf("  %-14s master=%-18s gate=%-10s W=%A  L=%A\n"
-               inst~>name inst~>master~>cellName gnet w l)
+        gnet = or( and( gt gt~>net gt~>net~>name ) "?" )   ; never nil (%s needs a string)
+        nm = or( inst~>name "?" )
+        mn = or( and( inst~>master inst~>master~>cellName ) "?" )
+        printf("  %-14s master=%-18s gate=%-10s W=%A  L=%A\n" nm mn gnet w l)
       )
     )
   )
